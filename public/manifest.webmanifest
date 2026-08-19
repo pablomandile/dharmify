@@ -2,7 +2,7 @@
     "name": "Dharmify",
     "short_name": "Dharmify",
     "description": "Mi biblioteca de enseñanzas de Dharma, para escuchar con o sin conexión.",
-    "start_url": "/dashboard",
+    "start_url": "/",
     "scope": "/",
     "display": "standalone",
     "orientation": "portrait-primary",
