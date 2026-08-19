@@ -18,8 +18,9 @@ const ingresarConGoogle = '/auth/google/redirect';
 
 defineOptions({
     layout: {
-        title: 'Log in to your account',
-        description: 'Enter your email and password below to log in',
+        title: 'Entrá a tu biblioteca',
+        description:
+            'Usá tu cuenta de Google, o tu email si ya tenés contraseña',
     },
 });
 
@@ -30,7 +31,7 @@ defineProps<{
 </script>
 
 <template>
-    <Head title="Log in" />
+    <Head title="Ingresar" />
 
     <div
         v-if="status"
@@ -71,11 +72,12 @@ defineProps<{
         Continuar con Google
     </a>
 
-    <div class="my-6 flex items-center gap-4">
-        <span class="h-px flex-1 bg-border" />
-        <span class="text-xs text-muted-foreground">o con tu email</span>
-        <span class="h-px flex-1 bg-border" />
-    </div>
+    <!--
+        Sin separador propio entre esto y el passkey: PasskeyVerify ya trae el
+        suyo antes del formulario de email, y agregar otro dejaba dos líneas
+        divisorias seguidas diciendo casi lo mismo.
+    -->
+    <div class="mt-3" />
 
     <PasskeyVerify />
 
@@ -87,7 +89,7 @@ defineProps<{
     >
         <div class="grid gap-6">
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="email">Email</Label>
                 <Input
                     id="email"
                     type="email"
@@ -96,21 +98,21 @@ defineProps<{
                     autofocus
                     :tabindex="1"
                     autocomplete="email"
-                    placeholder="email@example.com"
+                    placeholder="tu@email.com"
                 />
                 <InputError :message="errors.email" />
             </div>
 
             <div class="grid gap-2">
                 <div class="flex items-center justify-between">
-                    <Label for="password">Password</Label>
+                    <Label for="password">Contraseña</Label>
                     <TextLink
                         v-if="canResetPassword"
                         :href="request()"
                         class="text-sm"
                         :tabindex="5"
                     >
-                        Forgot your password?
+                        ¿Olvidaste tu contraseña?
                     </TextLink>
                 </div>
                 <PasswordInput
@@ -119,7 +121,7 @@ defineProps<{
                     required
                     :tabindex="2"
                     autocomplete="current-password"
-                    placeholder="Password"
+                    placeholder="Tu contraseña"
                 />
                 <InputError :message="errors.password" />
             </div>
@@ -127,7 +129,7 @@ defineProps<{
             <div class="flex items-center justify-between">
                 <Label for="remember" class="flex items-center space-x-3">
                     <Checkbox id="remember" name="remember" :tabindex="3" />
-                    <span>Remember me</span>
+                    <span>Mantener la sesión iniciada</span>
                 </Label>
             </div>
 
@@ -139,7 +141,7 @@ defineProps<{
                 data-test="login-button"
             >
                 <Spinner v-if="processing" />
-                Log in
+                Ingresar
             </Button>
         </div>
 
