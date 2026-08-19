@@ -26,6 +26,7 @@ defineOptions({
 
 defineProps<{
     status?: string;
+    errorDeIngreso?: string;
     canResetPassword: boolean;
 }>();
 </script>
@@ -38,6 +39,19 @@ defineProps<{
         class="mb-4 text-center text-sm font-medium text-green-600"
     >
         {{ status }}
+    </div>
+
+    <!--
+        Por qué rebotó un ingreso con Google. Va en línea y se queda en pantalla:
+        es la única explicación que tiene la persona de por qué volvió al login,
+        y un toast de tres segundos se pierde justo cuando hace falta leerlo.
+    -->
+    <div
+        v-if="errorDeIngreso"
+        class="mb-2 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        data-test="error-de-ingreso"
+    >
+        {{ errorDeIngreso }}
     </div>
 
     <!--

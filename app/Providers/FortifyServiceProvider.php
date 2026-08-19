@@ -51,6 +51,17 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::loginView(fn (Request $request) => Inertia::render('auth/Login', [
             'canResetPassword' => Features::enabled(Features::resetPasswords()),
             'status' => $request->session()->get('status'),
+
+            /*
+             * El motivo por el que rebotó un ingreso con Google.
+             *
+             * Va como prop y no como toast: la vuelta de Google es una carga de
+             * página completa, no una visita de Inertia, así que el evento de
+             * flash puede no llegar a dispararse. Y aunque llegara, el Toaster
+             * sólo está montado en los layouts de la app, no en los de
+             * autenticación: el cartel se emitía y no lo veía nadie.
+             */
+            'errorDeIngreso' => $request->session()->get('errorDeIngreso'),
         ]));
 
         Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/ResetPassword', [

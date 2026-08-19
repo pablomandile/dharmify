@@ -124,6 +124,23 @@ class IngresoConGoogleTest extends TestCase
         $this->get(route('google.callback'))->assertNotFound();
     }
 
+    /**
+     * El bug que hacía que el botón de Google "no hiciera nada": el rechazo
+     * volvía al login y el motivo no se veía por ningún lado. Tiene que llegar
+     * como prop, porque la vuelta de Google es una carga de página completa.
+     */
+    public function test_el_login_muestra_por_que_rebotó_un_ingreso(): void
+    {
+        $this->withSession(['errorDeIngreso' => 'La cuenta x@y.test no tiene acceso.'])
+            ->get(route('login'))
+            ->assertOk()
+            ->assertInertia(
+                fn ($page) => $page
+                    ->component('auth/Login')
+                    ->where('errorDeIngreso', 'La cuenta x@y.test no tiene acceso.')
+            );
+    }
+
     public function test_el_login_ofrece_el_boton_de_google(): void
     {
         $this->get(route('login'))->assertOk();

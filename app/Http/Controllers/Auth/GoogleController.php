@@ -10,7 +10,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Inertia\Inertia;
 use Laravel\Socialite\Facades\Socialite;
 use Symfony\Component\HttpFoundation\RedirectResponse as RespuestaDeSocialite;
 use Throwable;
@@ -49,15 +48,28 @@ class GoogleController extends Controller
             return redirect()->route('login');
         }
 
+        $cuenta = null;
+
         try {
-            $usuario = $this->ingreso->resolver(
-                CuentaDeGoogle::desdeSocialite(Socialite::driver('google')->user()),
-            );
-        } catch (AccesoNoAutorizado) {
-            // Caso esperado, no un fallo: entró bien a Google pero no está
-            // invitada. Se le dice con claridad y sin tecnicismos.
+            // Se asigna antes de resolver para poder nombrar la cuenta en el
+            // mensaje de rechazo: quien tiene varias sesiones de Google abiertas
+            // no tiene forma de saber con cuál entró.
+            $cuenta = CuentaDeGoogle::desdeSocialite(Socialite::driver('google')->user());
+
+            $usuario = $this->ingreso->resolver($cuenta);
+        } catch (AccesoNoAutorizado $e) {
+            /*
+             * Caso esperado, no un fallo: entró bien a Google pero no está
+             * invitada. Igual se registra —con el email— porque sin eso el
+             * rechazo no deja ningún rastro y no hay forma de saber si alguien
+             * quedó afuera por error de configuración o porque no corresponde.
+             */
+            Log::info('Ingreso con Google rechazado.', ['motivo' => $e->getMessage()]);
+
             return $this->volverAlLoginCon(
-                'Esa cuenta no tiene acceso a la biblioteca. Pedile una invitación al administrador.',
+                $cuenta
+                    ? "La cuenta {$cuenta->email} no tiene acceso a la biblioteca. Pedile una invitación al administrador."
+                    : 'Esa cuenta de Google no tiene acceso a la biblioteca. Pedile una invitación al administrador.',
             );
         } catch (Throwable $e) {
             /*
@@ -79,14 +91,17 @@ class GoogleController extends Controller
     }
 
     /**
-     * El cartel viaja por el mecanismo de flash de Inertia, que es el que la app
-     * ya usa para los toasts (ver resources/js/lib/flashToast.ts). Inventar un
-     * canal propio significaría que este error, y sólo este, se vea distinto.
+     * El cartel va por la sesión y lo muestra el login en línea, igual que su
+     * `status`.
+     *
+     * NO por el flash de Inertia: la vuelta de Google es una carga de página
+     * completa y no una visita, así que ese evento puede no dispararse; y el
+     * Toaster que lo mostraría sólo está montado en los layouts de la app, no
+     * en los de autenticación. El mensaje se emitía y no lo veía nadie: desde
+     * afuera, el botón de Google parecía no hacer nada.
      */
     private function volverAlLoginCon(string $mensaje): RedirectResponse
     {
-        Inertia::flash('toast', ['type' => 'error', 'message' => $mensaje]);
-
-        return redirect()->route('login');
+        return redirect()->route('login')->with('errorDeIngreso', $mensaje);
     }
 }
