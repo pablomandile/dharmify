@@ -67,9 +67,12 @@ class FortifyServiceProvider extends ServiceProvider
             'status' => $request->session()->get('status'),
         ]));
 
-        Fortify::registerView(fn () => Inertia::render('auth/Register', [
-            'passwordRules' => Password::defaults()->toPasswordRulesString(),
-        ]));
+        /*
+         * Acá iba Fortify::registerView(). No hay alta pública en Dharmify, así
+         * que Features::registration() está desactivada (ver config/fortify.php)
+         * y la página auth/Register.vue se eliminó: dejar la vista declarada
+         * apuntaría a un componente que ya no existe.
+         */
 
         Fortify::twoFactorChallengeView(fn () => Inertia::render('auth/TwoFactorChallenge'));
 

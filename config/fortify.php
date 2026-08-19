@@ -161,7 +161,18 @@ return [
     */
 
     'features' => [
-        Features::registration(),
+        /*
+         * Features::registration() va DESACTIVADA a propósito.
+         *
+         * Dharmify es una biblioteca personal: no hay alta pública. Con el
+         * registro abierto, cualquiera que llegue al subdominio se crea una
+         * cuenta y entra. El acceso se resuelve por Google + invitación (ver
+         * App\Http\Controllers\Auth\GoogleController); las cuentas nuevas las
+         * habilita el administrador, nunca el visitante.
+         *
+         * Al sacarla, `GET /register` deja de existir y RegistrationTest se
+         * saltea solo, porque usa skipUnlessFortifyHas().
+         */
         Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([
