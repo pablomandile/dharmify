@@ -1,3 +1,41 @@
+# FilesMatch mira el nombre del archivo y no la ruta, así que para distinguir los
+# assets de /build/ del resto hace falta marcarlos por URL. Va antes que los
+# headers porque es de otro módulo.
+<IfModule mod_setenvif.c>
+    SetEnvIf Request_URI "^/build/" ES_BUILD=1
+</IfModule>
+
+<IfModule mod_headers.c>
+    # sw.js y el manifest son los dos archivos con los que el navegador se entera
+    # de que hay una versión nueva: no pueden quedar cacheados. Sin esto, el CDN
+    # de Hostinger sirve un service worker viejo durante días —y como el service
+    # worker controla las demás cachés, congela todo lo demás también.
+    <FilesMatch "^(sw\.js|manifest\.webmanifest)$">
+        Header set Cache-Control "no-cache, must-revalidate, max-age=0"
+    </FilesMatch>
+
+    # Al revés que los de arriba: los assets de /build/ llevan hash de contenido
+    # en el nombre, así que un nombre nunca cambia de contenido. `immutable` le
+    # ahorra al navegador incluso la revalidación. El `env` es lo que evita que
+    # esta regla le pegue también a /sw.js, que es .js y no debe cachearse.
+    <FilesMatch "\.(js|css|woff2)$">
+        Header set Cache-Control "public, max-age=31536000, immutable" env=ES_BUILD
+    </FilesMatch>
+
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # La app no usa ningún hardware: reproducir audio no pide permisos.
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+</IfModule>
+
+# Muchos hostings sirven .webmanifest como text/plain, que incumple la spec.
+<IfModule mod_mime.c>
+    AddType application/manifest+json .webmanifest
+    AddType text/javascript .js
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes

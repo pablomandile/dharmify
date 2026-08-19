@@ -27,3 +27,7 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# El binario de rclone: pesa ~70 MB y se baja por plataforma (ver README).
+/bin/rclone
+/bin/rclone.exe
