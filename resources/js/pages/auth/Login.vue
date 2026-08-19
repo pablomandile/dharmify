@@ -73,12 +73,11 @@ defineProps<{
     </a>
 
     <!--
-        Sin separador propio entre esto y el passkey: PasskeyVerify ya trae el
-        suyo antes del formulario de email, y agregar otro dejaba dos líneas
-        divisorias seguidas diciendo casi lo mismo.
+        Sin separador ni espaciador propio entre esto y el passkey: el layout ya
+        separa a sus hijos con gap-8, y PasskeyVerify trae su propia línea antes
+        del formulario de email. Poner algo acá dejaba dos divisorias seguidas
+        diciendo lo mismo, y un hueco vacío enorme en el medio.
     -->
-    <div class="mt-3" />
-
     <PasskeyVerify />
 
     <Form
