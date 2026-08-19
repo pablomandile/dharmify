@@ -31,3 +31,6 @@ yarn-error.log
 # El binario de rclone: pesa ~70 MB y se baja por plataforma (ver README).
 /bin/rclone
 /bin/rclone.exe
+
+# Capturas de verificación, temporales.
+_*.png
