@@ -14,6 +14,7 @@
 import puppeteer from 'puppeteer-core';
 
 const URL_ARG = process.argv[2];
+
 if (!URL_ARG) {
     console.error('Uso: node check-pwa.mjs <url>');
     process.exit(1);
@@ -29,7 +30,14 @@ const CANDIDATOS = [
 ].filter(Boolean);
 
 const fs = await import('fs');
-const CHROME = CANDIDATOS.find((p) => { try { return fs.existsSync(p); } catch { return false; } });
+const CHROME = CANDIDATOS.find((p) => {
+ try {
+ return fs.existsSync(p); 
+} catch {
+ return false; 
+} 
+});
+
 if (!CHROME) {
     console.error('No encontré Chrome. Pasalo con CHROME=<ruta>');
     process.exit(1);
@@ -46,7 +54,9 @@ await page.setViewport({ width: 390, height: 800, isMobile: true, hasTouch: true
 // beforeinstallprompt dispara antes de que corra cualquier script de la página.
 await page.evaluateOnNewDocument(() => {
     window.__bip = false;
-    window.addEventListener('beforeinstallprompt', () => { window.__bip = true; });
+    window.addEventListener('beforeinstallprompt', () => {
+ window.__bip = true; 
+});
 });
 
 if (process.env.NO_WEBFONT) {
@@ -61,6 +71,7 @@ const mf = await client.send('Page.getAppManifest');
 console.log('== Manifest ==');
 console.log('  url    :', mf.url || '(no declarado)');
 console.log('  errors :', JSON.stringify(mf.errors ?? []));
+
 if (mf.data) {
     const d = JSON.parse(mf.data);
     console.log('  display:', d.display, '| start_url:', d.start_url);
@@ -68,6 +79,7 @@ if (mf.data) {
 }
 
 console.log('\n== Instalabilidad ==');
+
 try {
     const i = await client.send('Page.getInstallabilityErrors');
     const errs = i.installabilityErrors ?? [];
@@ -79,6 +91,7 @@ try {
 await new Promise((r) => setTimeout(r, 3500));
 const s = await page.evaluate(async () => {
     const regs = await navigator.serviceWorker.getRegistrations();
+
     return {
         beforeinstallprompt: window.__bip,
         hookEnHead: typeof window.__pwaInstall === 'object',
@@ -92,17 +105,25 @@ const s = await page.evaluate(async () => {
     };
 });
 console.log('\n== Estado en la página ==');
-for (const [k, v] of Object.entries(s)) console.log(`  ${k.padEnd(22)}`, JSON.stringify(v));
+
+for (const [k, v] of Object.entries(s)) {
+console.log(`  ${k.padEnd(22)}`, JSON.stringify(v));
+}
 
 console.log('\n== Headers críticos ==');
+
 for (const p of ['/sw.js', '/manifest.webmanifest']) {
     const r = await page.evaluate(async (u) => {
         try {
             const res = await fetch(new URL(u, location.origin), { cache: 'no-store' });
+
             return { status: res.status, type: res.headers.get('content-type'), cc: res.headers.get('cache-control') };
-        } catch (e) { return { error: String(e) }; }
+        } catch (e) {
+ return { error: String(e) }; 
+}
     }, p);
     console.log(`  ${p.padEnd(24)}`, JSON.stringify(r));
+
     if (r.cc && /max-age=(\d+)/.test(r.cc) && +RegExp.$1 > 86400) {
         console.log(`     AVISO: ${p} se cachea ${RegExp.$1}s. Las actualizaciones pueden tardar días en llegar.`);
     }
