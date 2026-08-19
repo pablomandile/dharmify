@@ -97,9 +97,10 @@ class IngresoConGoogleService
 
     private function rolPara(string $email): string
     {
-        $admin = config('dharmify.admin_email');
-
-        if (filled($admin) && mb_strtolower(trim((string) $admin)) === $email) {
+        // El email ya viene normalizado desde CuentaDeGoogle, y los de la
+        // configuración también: comparar en minúsculas es lo único que hace
+        // que "Pablo@Gmail.com" y "pablo@gmail.com" sean la misma persona.
+        if (in_array($email, config('dharmify.admin_emails'), strict: true)) {
             return User::ROL_ADMIN;
         }
 

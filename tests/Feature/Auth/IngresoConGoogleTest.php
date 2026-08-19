@@ -31,12 +31,28 @@ class IngresoConGoogleTest extends TestCase
 
     public function test_el_email_configurado_entra_como_administrador(): void
     {
-        config(['dharmify.admin_email' => 'duenio@example.test']);
+        config(['dharmify.admin_emails' => ['duenio@example.test']]);
 
         $usuario = $this->servicio()->resolver($this->cuenta('duenio@example.test'));
 
         $this->assertTrue($usuario->esAdmin());
         $this->assertSame('g-1', $usuario->google_id);
+    }
+
+    /**
+     * Tener la cuenta personal y la del trabajo es lo normal, y Google elige por
+     * vos con cuál entrás según qué sesión tengas abierta. Con un solo email
+     * permitido, entrar con la otra te deja afuera de tu propia biblioteca.
+     */
+    public function test_admite_varios_administradores_separados_por_coma(): void
+    {
+        config(['dharmify.admin_emails' => ['uno@example.test', 'otro@example.test']]);
+
+        foreach (['uno@example.test', 'otro@example.test'] as $i => $email) {
+            $usuario = $this->servicio()->resolver($this->cuenta($email, "g-{$i}"));
+
+            $this->assertTrue($usuario->esAdmin(), "no quedó admin: {$email}");
+        }
     }
 
     public function test_quien_tiene_invitacion_entra_como_invitado(): void
@@ -56,7 +72,7 @@ class IngresoConGoogleTest extends TestCase
      */
     public function test_una_cuenta_de_google_sin_invitacion_no_entra(): void
     {
-        config(['dharmify.admin_email' => 'duenio@example.test']);
+        config(['dharmify.admin_emails' => ['duenio@example.test']]);
 
         $this->expectException(AccesoNoAutorizado::class);
 
