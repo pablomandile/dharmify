@@ -35,4 +35,16 @@ return [
         ],
     ],
 
+    /*
+     * Ingreso con Google. Si falta cualquiera de las dos credenciales, las rutas
+     * de /auth/google contestan 404 en vez de explotar con un error de Socialite:
+     * así el código puede estar desplegado antes de que exista el proyecto en
+     * Google Cloud.
+     */
+    "google" => [
+        "client_id" => env("GOOGLE_CLIENT_ID"),
+        "client_secret" => env("GOOGLE_CLIENT_SECRET"),
+        "redirect" => env("GOOGLE_REDIRECT_URI"),
+    ],
+
 ];
