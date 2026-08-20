@@ -2,7 +2,7 @@
 
 namespace App\Importacion\Lectores;
 
-use App\Importacion\ArchivoDeAudio;
+use App\Importacion\ArchivoEnLaFuente;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
@@ -17,7 +17,7 @@ use Symfony\Component\Process\Process;
  */
 class LectorRclone implements LectorDeFuente
 {
-    private const EXTENSIONES = ['mp3', 'm4a', 'wav', 'ogg', 'opus', 'flac', 'aac', 'wma'];
+    private const AUDIO = ['mp3', 'm4a', 'wav', 'ogg', 'opus', 'flac', 'aac', 'wma'];
 
     /** Listar una biblioteca grande puede tardar minutos. */
     private const TIMEOUT = 900;
@@ -40,7 +40,7 @@ class LectorRclone implements LectorDeFuente
         return null;
     }
 
-    public function listar(string $raiz): iterable
+    public function listar(string $raiz, ?array $extensiones = null): iterable
     {
         $proceso = new Process(
             [$this->binario(), 'lsjson', $raiz, '--recursive', '--files-only', '--no-modtime'],
@@ -53,16 +53,17 @@ class LectorRclone implements LectorDeFuente
         }
 
         $items = json_decode($proceso->getOutput(), true) ?: [];
+        $buscadas = $extensiones ?? self::AUDIO;
 
         foreach ($items as $item) {
             $ruta = (string) ($item['Path'] ?? '');
             $extension = mb_strtolower(pathinfo($ruta, PATHINFO_EXTENSION));
 
-            if (! in_array($extension, self::EXTENSIONES, strict: true)) {
+            if (! in_array($extension, $buscadas, strict: true)) {
                 continue;
             }
 
-            yield new ArchivoDeAudio(
+            yield new ArchivoEnLaFuente(
                 ruta: $ruta,
                 nombre: (string) ($item['Name'] ?? basename($ruta)),
                 bytes: (int) ($item['Size'] ?? 0),

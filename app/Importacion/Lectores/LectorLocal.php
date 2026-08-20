@@ -2,7 +2,7 @@
 
 namespace App\Importacion\Lectores;
 
-use App\Importacion\ArchivoDeAudio;
+use App\Importacion\ArchivoEnLaFuente;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -17,7 +17,7 @@ use RecursiveIteratorIterator;
  */
 class LectorLocal implements LectorDeFuente
 {
-    private const EXTENSIONES = ['mp3', 'm4a', 'wav', 'ogg', 'opus', 'flac', 'aac', 'wma'];
+    private const AUDIO = ['mp3', 'm4a', 'wav', 'ogg', 'opus', 'flac', 'aac', 'wma'];
 
     public function verificar(string $raiz): ?string
     {
@@ -80,8 +80,9 @@ class LectorLocal implements LectorDeFuente
         return copy($origen, $destino);
     }
 
-    public function listar(string $raiz): iterable
+    public function listar(string $raiz, ?array $extensiones = null): iterable
     {
+        $buscadas = $extensiones ?? self::AUDIO;
         $raiz = rtrim(str_replace('\\', '/', $raiz), '/');
 
         $it = new RecursiveIteratorIterator(
@@ -94,13 +95,13 @@ class LectorLocal implements LectorDeFuente
                 continue;
             }
 
-            if (! in_array(mb_strtolower($archivo->getExtension()), self::EXTENSIONES, strict: true)) {
+            if (! in_array(mb_strtolower($archivo->getExtension()), $buscadas, strict: true)) {
                 continue;
             }
 
             $completa = str_replace('\\', '/', $archivo->getPathname());
 
-            yield new ArchivoDeAudio(
+            yield new ArchivoEnLaFuente(
                 ruta: ltrim(mb_substr($completa, mb_strlen($raiz)), '/'),
                 nombre: $archivo->getFilename(),
                 // getSize() sobre un marcador devuelve el tamaño real del

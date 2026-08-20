@@ -2,7 +2,7 @@
 
 namespace App\Importacion\Lectores;
 
-use App\Importacion\ArchivoDeAudio;
+use App\Importacion\ArchivoEnLaFuente;
 
 /**
  * Lista los audios de una fuente.
@@ -14,9 +14,16 @@ use App\Importacion\ArchivoDeAudio;
 interface LectorDeFuente
 {
     /**
-     * @return iterable<ArchivoDeAudio>
+     * Lo que hay en la fuente.
+     *
+     * Por omisión, los audios. Las carpetas de las series traen además el flyer
+     * del evento —110 jpg en la biblioteca real—, y para muchas series ésa es la
+     * única carátula que existe: el mp3 no trae ninguna imagen adentro.
+     *
+     * @param  list<string>|null  $extensiones  null = las de audio
+     * @return iterable<ArchivoEnLaFuente>
      */
-    public function listar(string $raiz): iterable;
+    public function listar(string $raiz, ?array $extensiones = null): iterable;
 
     /**
      * Los primeros bytes de un archivo, sin traerlo entero.

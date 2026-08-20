@@ -46,7 +46,7 @@ class EscanearFuente
             throw new \RuntimeException($problema);
         }
 
-        /** @var array<string, list<ArchivoDeAudio>> $porSerie */
+        /** @var array<string, list<ArchivoEnLaFuente>> $porSerie */
         $porSerie = [];
 
         foreach ($lector->listar($fuente->ruta) as $archivo) {
@@ -63,7 +63,7 @@ class EscanearFuente
              * Orden natural por ruta: "10 clase" tiene que ir después de
              * "9 clase", y un sort de texto los pone al revés.
              */
-            usort($archivos, fn (ArchivoDeAudio $a, ArchivoDeAudio $b) => strnatcasecmp($a->ruta, $b->ruta));
+            usort($archivos, fn (ArchivoEnLaFuente $a, ArchivoEnLaFuente $b) => strnatcasecmp($a->ruta, $b->ruta));
 
             foreach ($archivos as $i => $archivo) {
                 $clavesVistas[] = $this->pistaDe($fuente, $serie, $archivo, $i + 1);
@@ -130,7 +130,7 @@ class EscanearFuente
         return $serie;
     }
 
-    private function pistaDe(Fuente $fuente, Serie $serie, ArchivoDeAudio $archivo, int $orden): string
+    private function pistaDe(Fuente $fuente, Serie $serie, ArchivoEnLaFuente $archivo, int $orden): string
     {
         $clave = Pista::claveDe($fuente->id, $archivo->ruta);
 

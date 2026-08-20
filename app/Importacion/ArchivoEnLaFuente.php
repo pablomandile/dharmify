@@ -7,8 +7,11 @@ namespace App\Importacion;
  *
  * `ruta` es relativa a la raíz de la fuente y usa siempre "/", venga de Windows
  * o de rclone: es lo que después identifica a la pista para siempre.
+ *
+ * Sirve para cualquier archivo, no sólo audio: las carpetas de las series traen
+ * además el flyer del evento en jpg, y se listan igual.
  */
-class ArchivoDeAudio
+class ArchivoEnLaFuente
 {
     public function __construct(
         public readonly string $ruta,

@@ -2,9 +2,13 @@
 
 namespace App\Console\Commands;
 
+use App\Importacion\ArchivoEnLaFuente;
+use App\Importacion\EscanearFuente;
 use App\Importacion\ExtraerPortada;
+use App\Models\Fuente;
 use App\Models\Serie;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Throwable;
 
 /**
@@ -16,14 +20,17 @@ use Throwable;
  */
 class ExtraerPortadas extends Command
 {
+    /** Las que conviven con los mp3 en las carpetas de los eventos. */
+    private const IMAGENES = ['jpg', 'jpeg', 'png', 'webp'];
+
     protected $signature = 'dharma:portadas
         {--limite=40 : Cuántas series procesar en esta tanda}
         {--todas : Rehacer también las que ya tienen carátula}
         {--sin-portada : Reintentar sólo las que se revisaron y quedaron sin imagen}';
 
-    protected $description = 'Extrae la carátula de cada serie desde el primer audio, sin descargar los archivos';
+    protected $description = 'Busca la carátula de cada serie: el flyer de la carpeta o la imagen embebida en los audios';
 
-    public function handle(ExtraerPortada $extraer): int
+    public function handle(ExtraerPortada $extraer, EscanearFuente $escanear): int
     {
         $series = Serie::query()
             ->with('fuente')
@@ -50,17 +57,19 @@ class ExtraerPortadas extends Command
             return self::SUCCESS;
         }
 
+        $imagenes = $this->imagenesPorCarpeta($series, $escanear);
+
         $con = 0;
         $sin = 0;
 
         foreach ($series as $serie) {
             try {
-                if ($extraer($serie)) {
+                if ($extraer($serie, $imagenes[$serie->fuente_id][$serie->carpeta] ?? [])) {
                     $con++;
                     $this->line("  ✓ {$serie->titulo}");
                 } else {
                     $sin++;
-                    $this->line("  · sin carátula en el archivo: {$serie->titulo}");
+                    $this->line("  · sin imagen en ninguna parte: {$serie->titulo}");
                 }
             } catch (Throwable $e) {
                 $sin++;
@@ -74,5 +83,38 @@ class ExtraerPortadas extends Command
         $this->info("Carátulas nuevas: {$con} · sin imagen: {$sin} · quedan por revisar: {$faltan}");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Las imágenes sueltas de cada carpeta, listadas UNA vez por fuente.
+     *
+     * Preguntarle a la nube carpeta por carpeta serían 145 llamadas de diez
+     * segundos cada una; un solo listado recursivo trae los 1.751 archivos en
+     * unos segundos. Por eso el listado vive acá y no dentro del extractor.
+     *
+     * @param  Collection<int, Serie>  $series
+     * @return array<int, array<string, list<ArchivoEnLaFuente>>> fuente → carpeta → imágenes
+     */
+    private function imagenesPorCarpeta(Collection $series, EscanearFuente $escanear): array
+    {
+        $porFuente = [];
+
+        foreach (Fuente::findMany($series->pluck('fuente_id')->unique()->all()) as $fuente) {
+            $encontradas = [];
+
+            try {
+                foreach ($escanear->lectorPara($fuente)->listar($fuente->ruta, self::IMAGENES) as $imagen) {
+                    $encontradas[$imagen->serie()][] = $imagen;
+                }
+            } catch (Throwable $e) {
+                // Que no se pueda listar no es motivo para no mirar dentro de
+                // los audios, que es el otro camino.
+                $this->warn("No pude listar las imágenes de «{$fuente->nombre}»: {$e->getMessage()}");
+            }
+
+            $porFuente[$fuente->id] = $encontradas;
+        }
+
+        return $porFuente;
     }
 }
