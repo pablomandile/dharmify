@@ -107,6 +107,12 @@ class TaxonomiaDeCarpeta
         'Summer Festival' => 'festival',
         'Fall Festival' => 'festival',
         'Spring Festival' => 'festival',
+        // Las formas largas van primero: si gana "Festival Nacional" a secas, el
+        // título se queda con un "del Dharma" colgando adelante.
+        'Festival Argentino del Dharma' => 'festival',
+        'Festival Brasilero del Dharma' => 'festival',
+        'Festival Nacional del Dharma' => 'festival',
+        'Celebración Argentina del Dharma' => 'festival',
         'Festival Argentino' => 'festival',
         'Festival Brasilero' => 'festival',
         'Festival Nacional' => 'festival',
@@ -158,8 +164,33 @@ class TaxonomiaDeCarpeta
             anio: $anio,
             idioma: $idioma,
             maestros: $maestros,
-            titulo: trim(preg_replace('/\s{2,}/u', ' ', $resto), " \t-–—.,()"),
+            titulo: self::limpiarTitulo($resto),
         );
+    }
+
+    /**
+     * Deja el título presentable después de haberle sacado tipo, año, idioma y
+     * maestros.
+     *
+     * Sacar partes del medio de una frase deja conectores huérfanos en los
+     * bordes: "Festival Nacional del Dharma 2025 Vajrasatva" quedaba como
+     * "del Dharma Vajrasatva", y "Aprendé a Meditar 2020 Edgardo y Juanse" como
+     * "Aprendé a Meditar y". Se recortan sólo en los extremos, nunca en el medio.
+     */
+    private static function limpiarTitulo(string $resto): string
+    {
+        $conectores = 'del|de|la|el|los|las|y|e|con|por|para|a|en';
+
+        $limpio = preg_replace('/\s{2,}/u', ' ', $resto);
+        $limpio = trim((string) $limpio, " \t-–—.,()");
+
+        // Repetido, porque pueden quedar dos seguidos ("de la").
+        for ($i = 0; $i < 3; $i++) {
+            $limpio = preg_replace("/^({$conectores})\s+/iu", '', (string) $limpio);
+            $limpio = preg_replace("/\s+({$conectores})$/iu", '', (string) $limpio);
+        }
+
+        return trim((string) $limpio, " \t-–—.,()");
     }
 
     /**

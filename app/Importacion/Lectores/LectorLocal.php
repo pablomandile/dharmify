@@ -1,0 +1,60 @@
+<?php
+
+namespace App\Importacion\Lectores;
+
+use App\Importacion\ArchivoDeAudio;
+use FilesystemIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+
+/**
+ * Lee una carpeta del disco.
+ *
+ * Es lo que permite trabajar contra el OneDrive que sincroniza Windows. Detalle
+ * que importa: los archivos ahí suelen ser marcadores de "Archivos a pedido",
+ * no copias reales. Listar nombres, tamaños y rutas NO los descarga; abrirlos
+ * sí, y descarga el archivo ENTERO. Por eso este lector nunca lee contenido.
+ */
+class LectorLocal implements LectorDeFuente
+{
+    private const EXTENSIONES = ['mp3', 'm4a', 'wav', 'ogg', 'opus', 'flac', 'aac', 'wma'];
+
+    public function verificar(string $raiz): ?string
+    {
+        if (! is_dir($raiz)) {
+            return 'La carpeta no existe o no se puede leer desde el servidor.';
+        }
+
+        return null;
+    }
+
+    public function listar(string $raiz): iterable
+    {
+        $raiz = rtrim(str_replace('\\', '/', $raiz), '/');
+
+        $it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($raiz, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::LEAVES_ONLY,
+        );
+
+        foreach ($it as $archivo) {
+            if (! $archivo->isFile()) {
+                continue;
+            }
+
+            if (! in_array(mb_strtolower($archivo->getExtension()), self::EXTENSIONES, strict: true)) {
+                continue;
+            }
+
+            $completa = str_replace('\\', '/', $archivo->getPathname());
+
+            yield new ArchivoDeAudio(
+                ruta: ltrim(mb_substr($completa, mb_strlen($raiz)), '/'),
+                nombre: $archivo->getFilename(),
+                // getSize() sobre un marcador devuelve el tamaño real del
+                // original en la nube, sin traerlo.
+                bytes: (int) $archivo->getSize(),
+            );
+        }
+    }
+}

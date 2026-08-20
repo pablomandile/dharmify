@@ -112,6 +112,24 @@ class TaxonomiaDeCarpetaTest extends TestCase
         );
     }
 
+    /**
+     * Sacar el año y los maestros del medio de la frase deja conectores
+     * huérfanos en los bordes. Visto en los datos reales: "del Dharma
+     * Vajrasatva" y "Aprendé a Meditar y".
+     */
+    public function test_no_deja_conectores_sueltos_en_los_bordes_del_titulo(): void
+    {
+        $this->assertSame(
+            'Vajrasatva',
+            TaxonomiaDeCarpeta::desde('Festival Nacional del Dharma 2025 Vajrasatva guenla Kelsang Jampa (Español)')->titulo,
+        );
+
+        $this->assertSame(
+            'Aprendé a Meditar',
+            TaxonomiaDeCarpeta::desde('Curso Aprendé a Meditar 2020 Edgardo y Juanse')->titulo,
+        );
+    }
+
     public function test_prefiere_no_adivinar_cuando_no_hay_maestro(): void
     {
         $t = TaxonomiaDeCarpeta::desde('Celebración Argentina del Dharma 4 B.Medicina 2017');

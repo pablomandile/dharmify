@@ -12,6 +12,10 @@ export type User = {
 
 export type Auth = {
     user: User;
+
+    // Lo comparte HandleInertiaRequests. Sirve para no ofrecer en la UI lo que
+    // el servidor va a rechazar igual; no reemplaza al middleware.
+    esAdmin?: boolean;
 };
 
 export type Passkey = {

@@ -81,7 +81,14 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user(),
+                // Para que la UI no ofrezca lo que el servidor va a rechazar.
+                // No reemplaza al middleware: sólo evita mostrar puertas cerradas.
+                'esAdmin' => (bool) $request->user()?->esAdmin(),
             ],
+
+            // Mensajes de una sola vez que las pantallas muestran en línea.
+            'estado' => $request->session()->get('estado'),
+            'error' => $request->session()->get('error'),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

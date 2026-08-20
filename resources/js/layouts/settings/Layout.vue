@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -10,7 +11,14 @@ import { edit as editProfile } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import type { NavItem } from '@/types';
 
-const sidebarNavItems: NavItem[] = [
+const page = usePage();
+
+/*
+ * "Fuentes" sólo para el administrador. Es cosmético: quien la pida sin serlo
+ * recibe un 404 del middleware igual. Acá lo que se evita es ofrecer una puerta
+ * cerrada.
+ */
+const sidebarNavItems = computed<NavItem[]>(() => [
     {
         title: 'Perfil',
         href: editProfile(),
@@ -23,7 +31,10 @@ const sidebarNavItems: NavItem[] = [
         title: 'Apariencia',
         href: editAppearance(),
     },
-];
+    ...(page.props.auth?.esAdmin
+        ? [{ title: 'Fuentes', href: '/settings/fuentes' }]
+        : []),
+]);
 
 const { isCurrentOrParentUrl } = useCurrentUrl();
 </script>
