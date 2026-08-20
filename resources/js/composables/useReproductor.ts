@@ -36,10 +36,10 @@ if (audio) {
         'timeupdate',
         () => (posicion.value = audio.currentTime),
     );
-    audio.addEventListener(
-        'durationchange',
-        () => (duracion.value = audio.duration || 0),
-    );
+    audio.addEventListener('durationchange', () => {
+        duracion.value = audio.duration || 0;
+        avisarDuracion();
+    });
     audio.addEventListener('play', () => (sonando.value = true));
     audio.addEventListener('pause', () => (sonando.value = false));
     audio.addEventListener('ended', () => siguiente());
@@ -93,6 +93,42 @@ const ponerMediaSession = (pista: PistaReproducible) => {
 const csrf = () =>
     document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
         ?.content ?? '';
+
+/**
+ * Le devuelve al servidor la duración exacta que acaba de medir el navegador.
+ *
+ * El barrido de encabezados resuelve casi todas las pistas, pero no todas. Esto
+ * completa el resto sin costo: el dato ya está en memoria apenas carga el audio.
+ * Se avisa una sola vez por pista y por sesión, para no mandar un pedido en cada
+ * play.
+ */
+const avisadas = new Set<number>();
+
+const avisarDuracion = () => {
+    const pista = actual.value;
+    const segundos = audio?.duration ?? 0;
+
+    if (!pista || !Number.isFinite(segundos) || segundos < 1) {
+        return;
+    }
+
+    if (avisadas.has(pista.id)) {
+        return;
+    }
+
+    avisadas.add(pista.id);
+
+    // Si falla no pasa nada: es un dato de más, no parte de reproducir.
+    fetch(`/pistas/${pista.id}/duracion`, {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': csrf(),
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ segundos: Math.round(segundos) }),
+    }).catch(() => {});
+};
 
 /**
  * Play sobre algo que puede no estar en el server.

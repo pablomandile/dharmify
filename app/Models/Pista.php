@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $ruta
  * @property int $bytes
  * @property int|null $duracion_seg
+ * @property CarbonImmutable|null $duracion_revisada_en
  * @property int $orden
  * @property CarbonImmutable|null $grabada_el
  * @property bool $en_server
@@ -41,6 +42,7 @@ class Pista extends Model
         return [
             'bytes' => 'integer',
             'duracion_seg' => 'integer',
+            'duracion_revisada_en' => 'datetime',
             'orden' => 'integer',
             'grabada_el' => 'date',
             'en_server' => 'boolean',

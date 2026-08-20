@@ -17,6 +17,7 @@ type Serie = {
     anio: number | null;
     idioma: string;
     pistas: number;
+    segundos: number | null;
     maestros: Maestro[];
 };
 
@@ -99,6 +100,21 @@ const etiquetaPagina = (label: string) => {
     }
 
     return limpio || '…';
+};
+
+/*
+ * El total viene en null cuando alguna pista de la serie todavía no fue medida:
+ * mostrar una suma incompleta diría que un retiro de doce horas dura nueve.
+ */
+const duracion = (segundos: number | null) => {
+    if (!segundos) {
+        return null;
+    }
+
+    const h = Math.floor(segundos / 3600);
+    const m = Math.round((segundos % 3600) / 60);
+
+    return h ? `${h} h ${m} min` : `${m} min`;
 };
 
 const etiquetaTipo: Record<string, string> = {
@@ -277,6 +293,9 @@ const etiquetaTipo: Record<string, string> = {
                             >{{ serie.pistas }}
                             {{ serie.pistas === 1 ? 'audio' : 'audios' }}</span
                         >
+                        <span v-if="duracion(serie.segundos)">
+                            {{ duracion(serie.segundos) }}
+                        </span>
                         <Badge v-if="serie.idioma === 'en'" variant="outline">
                             Inglés
                         </Badge>

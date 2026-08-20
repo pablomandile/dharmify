@@ -107,6 +107,16 @@ const duracion = (segundos: number | null) => {
 const pesoTotal = computed(() =>
     props.pistas.reduce((suma, p) => suma + p.bytes, 0),
 );
+
+/*
+ * El total sólo se muestra si todas las pistas están medidas: con una sola sin
+ * medir, la suma queda corta y diría que un retiro de doce horas dura nueve.
+ */
+const duracionTotal = computed(() =>
+    props.pistas.length && props.pistas.every((p) => p.duracion_seg)
+        ? props.pistas.reduce((suma, p) => suma + (p.duracion_seg ?? 0), 0)
+        : null,
+);
 </script>
 
 <template>
@@ -158,8 +168,11 @@ const pesoTotal = computed(() =>
 
                 <p class="mt-2 text-sm text-muted-foreground">
                     {{ pistas.length }}
-                    {{ pistas.length === 1 ? 'audio' : 'audios' }} ·
-                    {{ enMegas(pesoTotal) }}
+                    {{ pistas.length === 1 ? 'audio' : 'audios' }}
+                    <template v-if="duracion(duracionTotal)">
+                        · {{ duracion(duracionTotal) }}
+                    </template>
+                    · {{ enMegas(pesoTotal) }}
                 </p>
 
                 <!--

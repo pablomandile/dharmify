@@ -53,6 +53,18 @@ class LectorLocal implements LectorDeFuente
         return $datos !== false ? $datos : null;
     }
 
+    /**
+     * En disco no hay nada que paralelizar: el costo no es la espera de red
+     * sino la hidratación del archivo, y lanzar cuatro a la vez sólo bajaría
+     * cuatro archivos enteros en vez de uno.
+     */
+    public function cabeceras(string $raiz, array $rutas, callable $alLlegar, int $bytes = 400000, int $paralelo = 4): void
+    {
+        foreach ($rutas as $ruta) {
+            $alLlegar($ruta, $this->cabecera($raiz, $ruta, $bytes));
+        }
+    }
+
     public function traer(string $raiz, string $ruta, string $destino): bool
     {
         $origen = rtrim(str_replace('\\', '/', $raiz), '/').'/'.$ruta;

@@ -7,6 +7,7 @@ use App\Models\Fuente;
 use App\Models\Pista;
 use App\Models\Serie;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
@@ -108,6 +109,38 @@ class PistaController extends Controller
             'en_server' => is_file($this->rutaLocal($pista)),
             'en_nube' => $pista->en_nube,
         ]);
+    }
+
+    /**
+     * La duración que midió el reproductor.
+     *
+     * El barrido de encabezados resuelve casi todo, pero no todo: hay archivos
+     * cuyo encabezado no alcanza y quedan sin duración. El navegador, en cambio,
+     * la sabe exacta apenas carga el audio, y no cuesta nada preguntársela.
+     *
+     * Así la biblioteca se va corrigiendo sola: lo que alguien escucha, queda
+     * medido.
+     */
+    public function duracion(Request $request, Pista $pista): JsonResponse
+    {
+        $this->autorizar($pista);
+
+        $datos = $request->validate([
+            'segundos' => ['required', 'integer', 'min:1', 'max:86400'],
+        ]);
+
+        $segundos = (int) $datos['segundos'];
+
+        // Sólo se escribe si cambia algo. Sin esto, cada play de cada persona
+        // sería un UPDATE para dejar el mismo número que ya estaba.
+        if (abs(($pista->duracion_seg ?? 0) - $segundos) >= 2) {
+            $pista->forceFill([
+                'duracion_seg' => $segundos,
+                'duracion_revisada_en' => now(),
+            ])->save();
+        }
+
+        return response()->json(['duracion_seg' => $pista->duracion_seg]);
     }
 
     public function descargar(Pista $pista): StreamedResponse|JsonResponse

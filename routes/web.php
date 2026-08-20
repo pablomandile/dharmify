@@ -55,6 +55,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('pistas/{pista}/restaurar', [PistaController::class, 'restaurar'])->name('pistas.restaurar');
 
     /*
+     * El reproductor devuelve la duración exacta apenas carga el audio. Es lo
+     * que completa las pocas pistas cuyo encabezado no alcanzó para calcularla.
+     */
+    Route::post('pistas/{pista}/duracion', [PistaController::class, 'duracion'])->name('pistas.duracion');
+
+    /*
      * El estado va bajo /api porque el service worker tiene prohibido cachear
      * esa rama: una copia vieja diciendo "en la nube" cuando el archivo ya está
      * es peor que un error de red.

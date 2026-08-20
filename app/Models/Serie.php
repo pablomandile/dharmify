@@ -21,6 +21,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $anio
  * @property string $idioma
  * @property bool $editada_a_mano
+ *
+ * Lo que agrega `withSum('pistas', 'duracion_seg')` en la biblioteca. Va acá
+ * por lo mismo que las columnas: es una propiedad real que ningún analizador
+ * puede adivinar leyendo la clase.
+ * @property-read int|null $pistas_sum_duracion_seg
  */
 #[Fillable([
     'fuente_id', 'carpeta', 'carpeta_hash', 'titulo', 'slug',
@@ -37,6 +42,20 @@ class Serie extends Model
             'editada_a_mano' => 'boolean',
             'portada_revisada_en' => 'datetime',
         ];
+    }
+
+    /**
+     * Las pistas que ya tienen la duración medida.
+     *
+     * Es una relación aparte y no un `withCount` con alias porque así se puede
+     * contar en la misma consulta y el tipo queda claro: la biblioteca necesita
+     * saber si el total de una serie está completo antes de mostrarlo.
+     *
+     * @return HasMany<Pista, $this>
+     */
+    public function pistasMedidas(): HasMany
+    {
+        return $this->pistas()->whereNotNull('duracion_seg');
     }
 
     /** @return BelongsTo<Fuente, $this> */

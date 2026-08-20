@@ -29,6 +29,14 @@ class BibliotecaController extends Controller
         $series = $this->visibles()
             ->with('maestros:id,nombre,slug')
             ->withCount('pistas')
+            /*
+             * El total de la serie se muestra sólo si TODAS sus pistas tienen
+             * duración medida: con una sola sin medir, la suma queda corta y
+             * diría que un retiro de doce horas dura nueve. Por eso además del
+             * total se cuenta cuántas están medidas.
+             */
+            ->withSum('pistas', 'duracion_seg')
+            ->withCount('pistasMedidas')
             ->when(
                 $filtros['buscar'] ?? null,
                 fn (Builder $q, string $texto) => $q->where(function (Builder $q) use ($texto) {
@@ -63,6 +71,9 @@ class BibliotecaController extends Controller
                 'anio' => $s->anio,
                 'idioma' => $s->idioma,
                 'pistas' => $s->pistas_count,
+                'segundos' => $s->pistas_count > 0 && $s->pistas_medidas_count === $s->pistas_count
+                    ? (int) $s->pistas_sum_duracion_seg
+                    : null,
                 'maestros' => $s->maestros->map(fn (Maestro $m) => ['nombre' => $m->nombre, 'slug' => $m->slug]),
             ]);
 

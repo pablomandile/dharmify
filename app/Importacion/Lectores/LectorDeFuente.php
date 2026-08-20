@@ -27,6 +27,25 @@ interface LectorDeFuente
     public function cabecera(string $raiz, string $ruta, int $bytes = 400000): ?string;
 
     /**
+     * Los encabezados de muchos archivos, avisando por cada uno apenas llega.
+     *
+     * Es un método aparte y no un `foreach` sobre `cabecera()` por una razón
+     * medida contra la biblioteca real: cada lectura de OneDrive tarda unos 9
+     * segundos y casi todo es espera de red, no transferencia (32 KB tardan
+     * 7,5 s; 400 KB, 9 s). De a cuatro en paralelo, ocho archivos pasaron de
+     * 81 a 10 segundos. Sobre 928 pistas es la diferencia entre dos horas y
+     * media y veinte minutos.
+     *
+     * Se entrega por callback y no como arreglo para no juntar cientos de
+     * encabezados de 400 KB en memoria: cada uno se procesa y se descarta. De
+     * paso, el trabajo queda guardado aunque el proceso muera a la mitad.
+     *
+     * @param  list<string>  $rutas
+     * @param  callable(string, ?string): void  $alLlegar  recibe (ruta, encabezado o null)
+     */
+    public function cabeceras(string $raiz, array $rutas, callable $alLlegar, int $bytes = 400000, int $paralelo = 4): void;
+
+    /**
      * Trae un archivo completo al server.
      *
      * Es lo que pasa cuando alguien le da play a algo que está sólo en la nube.

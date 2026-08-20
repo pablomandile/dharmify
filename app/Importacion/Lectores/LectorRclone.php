@@ -3,6 +3,7 @@
 namespace App\Importacion\Lectores;
 
 use App\Importacion\ArchivoDeAudio;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
 /**
@@ -71,15 +72,75 @@ class LectorRclone implements LectorDeFuente
 
     public function cabecera(string $raiz, string $ruta, int $bytes = 400000): ?string
     {
-        // `cat --head` trae sólo los primeros bytes: 400 KB alcanzan para los
-        // tags y la carátula. Bajar el archivo entero serían ~25 MB por pista.
-        $proceso = new Process(
-            [$this->binario(), 'cat', '--head', (string) $bytes, rtrim($raiz, '/').'/'.$ruta],
-            timeout: 120,
-        );
-        $proceso->run();
+        $cabecera = null;
 
-        return $proceso->isSuccessful() ? $proceso->getOutput() : null;
+        $this->cabeceras(
+            $raiz,
+            [$ruta],
+            function (string $_, ?string $datos) use (&$cabecera) {
+                $cabecera = $datos;
+            },
+            $bytes,
+            paralelo: 1,
+        );
+
+        return $cabecera;
+    }
+
+    public function cabeceras(string $raiz, array $rutas, callable $alLlegar, int $bytes = 400000, int $paralelo = 4): void
+    {
+        $binario = $this->binario();
+        $raiz = rtrim($raiz, '/');
+        $pendientes = $rutas;
+
+        /** @var array<string, Process> $corriendo */
+        $corriendo = [];
+
+        while ($pendientes !== [] || $corriendo !== []) {
+            while ($pendientes !== [] && count($corriendo) < max(1, $paralelo)) {
+                $ruta = array_shift($pendientes);
+
+                // `cat --head` trae sólo los primeros bytes: 400 KB alcanzan
+                // para los tags y la carátula. Bajar el archivo entero serían
+                // ~25 MB por pista.
+                $proceso = new Process(
+                    [$binario, 'cat', '--head', (string) $bytes, $raiz.'/'.$ruta],
+                    timeout: 120,
+                );
+                $proceso->start();
+                $corriendo[$ruta] = $proceso;
+            }
+
+            foreach ($corriendo as $ruta => $proceso) {
+                try {
+                    /*
+                     * Con `start()` el vencimiento no se controla solo: sin esta
+                     * llamada, un archivo que la nube nunca contesta deja el
+                     * barrido colgado para siempre.
+                     */
+                    $proceso->checkTimeout();
+                } catch (ProcessTimedOutException) {
+                    unset($corriendo[$ruta]);
+                    $alLlegar($ruta, null);
+
+                    continue;
+                }
+
+                if ($proceso->isRunning()) {
+                    continue;
+                }
+
+                unset($corriendo[$ruta]);
+                $alLlegar($ruta, $proceso->isSuccessful() ? $proceso->getOutput() : null);
+            }
+
+            if ($corriendo !== []) {
+                // Sin la pausa, el bucle quema un núcleo entero preguntando si
+                // ya terminaron, que es justo lo que no sobra en un hosting
+                // compartido.
+                usleep(50000);
+            }
+        }
     }
 
     public function traer(string $raiz, string $ruta, string $destino): bool
