@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid } from '@lucide/vue';
+import { Link, router } from '@inertiajs/vue3';
+import { LayoutGrid } from '@lucide/vue';
+import { onUnmounted } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
-import NavFooter from '@/components/NavFooter.vue';
+import BotonInstalar from '@/components/BotonInstalar.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import {
@@ -13,30 +14,46 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
     {
-        title: 'Dashboard',
+        title: 'Dharma',
         href: dashboard(),
         icon: LayoutGrid,
     },
 ];
 
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: FolderGit2,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
-    },
-];
+/*
+ * Acá venían "Repositorio" y "Documentación", que apuntaban al repo del starter
+ * kit y a la doc de Laravel. Son andamiaje: en una biblioteca de enseñanzas no
+ * significan nada para quien la usa.
+ */
+
+const { isMobile, setOpenMobile } = useSidebar();
+
+/*
+ * En el celular la barra lateral es una hoja a pantalla completa, y navegar por
+ * el cliente no la desmonta: sin esto, elegís una opción, la pantalla nueva
+ * carga detrás, y el menú queda encima tapándola con el scroll del body
+ * bloqueado. En escritorio la barra es fija, así que cerrarla al navegar sería
+ * quedarse sin menú a cada paso: por eso sólo en mobile.
+ *
+ * Va en el router y no en cada enlace, que es lo que se olvida en cuanto alguien
+ * agrega el enlace número siete. Y en `navigate` y no en `start`, porque `start`
+ * también dispara con cualquier recarga de fondo y cerraría el menú mientras la
+ * persona lo está mirando.
+ */
+onUnmounted(
+    router.on('navigate', () => {
+        if (isMobile.value) {
+            setOpenMobile(false);
+        }
+    }),
+);
 </script>
 
 <template>
@@ -58,7 +75,7 @@ const footerNavItems: NavItem[] = [
         </SidebarContent>
 
         <SidebarFooter>
-            <NavFooter :items="footerNavItems" />
+            <BotonInstalar />
             <NavUser />
         </SidebarFooter>
     </Sidebar>

@@ -25,14 +25,14 @@ const passwordInput = useTemplateRef('passwordInput');
     <div class="space-y-6">
         <Heading
             variant="small"
-            title="Delete account"
-            description="Delete your account and all of its resources"
+            title="Eliminar la cuenta"
+            description="Eliminá tu cuenta y todo lo que tenga adentro"
         />
         <div
             class="space-y-4 rounded-lg border border-red-100 bg-red-50 p-4 dark:border-red-200/10 dark:bg-red-700/10"
         >
             <div class="relative space-y-0.5 text-red-600 dark:text-red-100">
-                <p class="font-medium">Warning</p>
+                <p class="font-medium">Atención</p>
                 <p class="text-sm">
                     Please proceed with caution, this cannot be undone.
                 </p>
@@ -40,7 +40,7 @@ const passwordInput = useTemplateRef('passwordInput');
             <Dialog>
                 <DialogTrigger as-child>
                     <Button variant="destructive" data-test="delete-user-button"
-                        >Delete account</Button
+                        >Eliminar la cuenta</Button
                     >
                 </DialogTrigger>
                 <DialogContent>
@@ -70,13 +70,13 @@ const passwordInput = useTemplateRef('passwordInput');
 
                         <div class="grid gap-2">
                             <Label for="password" class="sr-only"
-                                >Password</Label
+                                >Contraseña</Label
                             >
                             <PasswordInput
                                 id="password"
                                 name="password"
                                 ref="passwordInput"
-                                placeholder="Password"
+                                placeholder="Tu contraseña"
                             />
                             <InputError :message="errors.password" />
                         </div>

@@ -19,13 +19,13 @@ defineOptions({
 <template>
     <Head title="Appearance settings" />
 
-    <h1 class="sr-only">Appearance settings</h1>
+    <h1 class="sr-only">Configuración de apariencia</h1>
 
     <div class="space-y-6">
         <Heading
             variant="small"
             title="Appearance settings"
-            description="Update the appearance settings for your account"
+            description="Elegí cómo se ve la app"
         />
         <AppearanceTabs />
     </div>

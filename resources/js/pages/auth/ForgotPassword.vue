@@ -12,7 +12,7 @@ import { email } from '@/routes/password';
 defineOptions({
     layout: {
         title: 'Forgot password',
-        description: 'Enter your email to receive a password reset link',
+        description: 'Poné tu email y te mandamos un enlace para restablecerla',
     },
 });
 
@@ -34,7 +34,7 @@ defineProps<{
     <div class="space-y-6">
         <Form v-bind="email.form()" v-slot="{ errors, processing }">
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="email">Email</Label>
                 <Input
                     id="email"
                     type="email"
@@ -59,7 +59,7 @@ defineProps<{
         </Form>
 
         <div class="space-x-1 text-center text-sm text-muted-foreground">
-            <span>Or, return to</span>
+            <span>O volvé a</span>
             <TextLink :href="login()">log in</TextLink>
         </div>
     </div>

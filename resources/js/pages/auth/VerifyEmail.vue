@@ -8,9 +8,9 @@ import { send } from '@/routes/verification';
 
 defineOptions({
     layout: {
-        title: 'Email verification',
+        title: 'Verificá tu email',
         description:
-            'Please verify your email address by clicking on the link we just emailed to you.',
+            'Verificá tu email haciendo clic en el enlace que te acabamos de enviar.',
     },
 });
 
@@ -20,7 +20,7 @@ defineProps<{
 </script>
 
 <template>
-    <Head title="Email verification" />
+    <Head title="Verificá tu email" />
 
     <div
         v-if="status === 'verification-link-sent'"

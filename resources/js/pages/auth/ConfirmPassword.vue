@@ -14,22 +14,22 @@ import { store } from '@/routes/password/confirm';
 
 defineOptions({
     layout: {
-        title: 'Confirm password',
+        title: 'Confirmá tu contraseña',
         description:
-            'This is a secure area of the application. Please confirm your password before continuing.',
+            'Esta es un área protegida. Confirmá tu contraseña para seguir.',
     },
 });
 </script>
 
 <template>
-    <Head title="Confirm password" />
+    <Head title="Repetí la contraseña" />
 
     <PasskeyVerify
         :routes="{
             options: confirmOptions(),
             submit: confirmStore(),
         }"
-        label="Confirm with passkey"
+        label="Confirmar con llave de acceso"
         loading-label="Confirming..."
         separator="Or confirm with password"
     />
@@ -41,7 +41,7 @@ defineOptions({
     >
         <div class="space-y-6">
             <div class="grid gap-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Contraseña</Label>
                 <PasswordInput
                     id="password"
                     name="password"

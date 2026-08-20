@@ -12,7 +12,7 @@ import { update } from '@/routes/password';
 defineOptions({
     layout: {
         title: 'Reset password',
-        description: 'Please enter your new password below',
+        description: 'Elegí tu contraseña nueva',
     },
 });
 
@@ -50,14 +50,14 @@ const inputEmail = ref(props.email);
             </div>
 
             <div class="grid gap-2">
-                <Label for="password">Password</Label>
+                <Label for="password">Contraseña</Label>
                 <PasswordInput
                     id="password"
                     name="password"
                     autocomplete="new-password"
                     class="mt-1 block w-full"
                     autofocus
-                    placeholder="Password"
+                    placeholder="Tu contraseña"
                     :passwordrules="passwordRules"
                 />
                 <InputError :message="errors.password" />
@@ -70,7 +70,7 @@ const inputEmail = ref(props.email);
                     name="password_confirmation"
                     autocomplete="new-password"
                     class="mt-1 block w-full"
-                    placeholder="Confirm password"
+                    placeholder="Repetí la contraseña"
                     :passwordrules="passwordRules"
                 />
                 <InputError :message="errors.password_confirmation" />
