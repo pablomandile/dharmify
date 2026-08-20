@@ -16,13 +16,13 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from '@/components/ui/sidebar';
-import { dashboard } from '@/routes';
+import { biblioteca } from '@/routes';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
     {
         title: 'Dharma',
-        href: dashboard(),
+        href: biblioteca(),
         icon: LayoutGrid,
     },
 ];
@@ -62,7 +62,7 @@ onUnmounted(
             <SidebarMenu>
                 <SidebarMenuItem>
                     <SidebarMenuButton size="lg" as-child>
-                        <Link :href="dashboard()">
+                        <Link :href="biblioteca()">
                             <AppLogo />
                         </Link>
                     </SidebarMenuButton>

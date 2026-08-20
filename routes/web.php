@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\GoogleController;
+use App\Http\Controllers\BibliotecaController;
 use App\Http\Controllers\InicioController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,7 +35,14 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+    /*
+     * La pantalla principal. Se llama `biblioteca` y no `dashboard`: no es un
+     * tablero de métricas, es el catálogo, y el nombre de la ruta debería decir
+     * lo mismo que la URL.
+     */
+    Route::get('biblioteca', [BibliotecaController::class, 'index'])->name('biblioteca');
+
+    Route::get('series/{serie}', [BibliotecaController::class, 'serie'])->name('series.show');
 });
 
 require __DIR__.'/settings.php';

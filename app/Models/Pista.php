@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $bytes
  * @property int|null $duracion_seg
  * @property int $orden
+ * @property CarbonImmutable|null $grabada_el
  * @property bool $en_server
  * @property bool $en_nube
  * @property CarbonImmutable|null $ultimo_acceso_en

@@ -19,6 +19,6 @@ class InicioController extends Controller
 {
     public function __invoke(): RedirectResponse
     {
-        return redirect()->route(Auth::check() ? 'dashboard' : 'login');
+        return redirect()->route(Auth::check() ? 'biblioteca' : 'login');
     }
 }

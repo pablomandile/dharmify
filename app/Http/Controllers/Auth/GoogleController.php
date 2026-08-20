@@ -87,7 +87,7 @@ class GoogleController extends Controller
         Auth::login($usuario, remember: true);
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard'));
+        return redirect()->intended(route('biblioteca'));
     }
 
     /**

@@ -27,6 +27,6 @@ class ExampleTest extends TestCase
 
         $this->actingAs($usuario)
             ->get(route('home'))
-            ->assertRedirect(route('dashboard'));
+            ->assertRedirect(route('biblioteca'));
     }
 }
