@@ -119,6 +119,34 @@ class DuracionTest extends TestCase
         $this->assertSame(0, Pista::whereNull('duracion_revisada_en')->count());
     }
 
+    /**
+     * La distinción que costó una tanda entera en producción: un encabezado que
+     * no llega NO es lo mismo que un encabezado sin duración.
+     *
+     * Contra la nube pasó de verdad —el hosting se quedó sin hilos y rclone
+     * devolvió vacío en siete de ocho pistas—. Si esas siete quedaran marcadas
+     * como revisadas, nadie las volvería a mirar nunca.
+     */
+    public function test_lo_que_no_se_pudo_leer_queda_pendiente_y_no_marcado(): void
+    {
+        $this->mp3('01 Primera charla.mp3', cuadros: 5000);
+        $this->mp3('02 Segunda charla.mp3', cuadros: 5000);
+
+        app(EscanearFuente::class)($this->fuente());
+
+        // El archivo desaparece después del escaneo: el catálogo la sigue
+        // teniendo, pero su encabezado ya no se puede leer.
+        unlink($this->raiz.'/Retiro de Vacuidad 2013 Guen Togden/02 Segunda charla.mp3');
+
+        $resultado = app(ExtraerDuracion::class)->deLote(Pista::with('serie.fuente')->get());
+
+        $ilegible = Pista::where('archivo', '02 Segunda charla.mp3')->firstOrFail();
+
+        $this->assertSame(1, $resultado['con']);
+        $this->assertSame(1, $resultado['ilegibles']);
+        $this->assertNull($ilegible->duracion_revisada_en, 'tiene que volver a intentarse en la próxima tanda');
+    }
+
     public function test_el_reproductor_puede_corregir_la_duracion_que_midio(): void
     {
         $this->mp3('01 Primera charla.mp3', cuadros: 5000);

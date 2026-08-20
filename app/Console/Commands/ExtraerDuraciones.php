@@ -21,7 +21,7 @@ class ExtraerDuraciones extends Command
 {
     protected $signature = 'dharma:duraciones
         {--limite=200 : Cuántas pistas leer en esta tanda}
-        {--paralelo=4 : Cuántas lecturas simultáneas contra la nube}
+        {--paralelo=3 : Cuántas lecturas simultáneas contra la nube}
         {--todas : Releer también las que ya tienen duración}
         {--igual : Correr aunque la fuente sea una carpeta local (baja los archivos enteros)}';
 
@@ -63,7 +63,18 @@ class ExtraerDuraciones extends Command
         $faltan = Pista::where('en_nube', true)->whereNull('duracion_revisada_en')->count();
 
         $this->newLine();
-        $this->info("Duraciones nuevas: {$resultado['con']} · sin resolver: {$resultado['sin']} · quedan por revisar: {$faltan}");
+        $this->info("Duraciones nuevas: {$resultado['con']} · sin duración en el encabezado: {$resultado['sin']} · quedan por revisar: {$faltan}");
+
+        if ($resultado['ilegibles'] > 0) {
+            /*
+             * Distinto de "no tiene duración en el encabezado": acá la nube no
+             * contestó. Esas pistas quedan SIN marcar a propósito, así que la
+             * próxima tanda las vuelve a intentar. Se avisa para que no pase
+             * inadvertido: si el número es grande, algo está mal con rclone y
+             * no con la biblioteca.
+             */
+            $this->warn("No se pudieron leer {$resultado['ilegibles']} pistas (quedan pendientes para la próxima tanda).");
+        }
 
         return self::SUCCESS;
     }

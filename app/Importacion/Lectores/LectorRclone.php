@@ -87,7 +87,7 @@ class LectorRclone implements LectorDeFuente
         return $cabecera;
     }
 
-    public function cabeceras(string $raiz, array $rutas, callable $alLlegar, int $bytes = 400000, int $paralelo = 4): void
+    public function cabeceras(string $raiz, array $rutas, callable $alLlegar, int $bytes = 400000, int $paralelo = 3): void
     {
         $binario = $this->binario();
         $raiz = rtrim($raiz, '/');
@@ -105,6 +105,19 @@ class LectorRclone implements LectorDeFuente
                 // ~25 MB por pista.
                 $proceso = new Process(
                     [$binario, 'cat', '--head', (string) $bytes, $raiz.'/'.$ruta],
+                    /*
+                     * rclone está escrito en Go y arranca un puñado de hilos del
+                     * sistema por proceso. El hosting limita cuántos puede tener
+                     * la cuenta entera —contando los del servidor web— y con
+                     * cuatro lecturas a la vez el límite se cruza: rclone muere
+                     * con "failed to create new OS thread (have 14 already;
+                     * errno=11)" y devuelve un encabezado vacío.
+                     *
+                     * Achicar el planificador de Go baja los hilos por proceso.
+                     * Para esto no cuesta nada: el trabajo es esperar la red, no
+                     * calcular.
+                     */
+                    env: ['GOMAXPROCS' => '2'],
                     timeout: 120,
                 );
                 $proceso->start();

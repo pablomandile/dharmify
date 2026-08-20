@@ -51,12 +51,13 @@ class ExtraerDuracion
      * lo hecho queda hecho y relanzar retoma donde iba.
      *
      * @param  Collection<int, Pista>  $pistas
-     * @return array{con: int, sin: int}
+     * @return array{con: int, sin: int, ilegibles: int}
      */
-    public function deLote(Collection $pistas, int $paralelo = 4): array
+    public function deLote(Collection $pistas, int $paralelo = 3): array
     {
         $con = 0;
         $sin = 0;
+        $ilegibles = 0;
 
         $porFuente = $pistas->groupBy(fn (Pista $p) => $p->serie->fuente_id);
         $fuentes = Fuente::findMany($porFuente->keys()->all())->keyBy('id');
@@ -79,38 +80,86 @@ class ExtraerDuracion
                 $porRuta[$pista->ruta][] = $pista;
             }
 
-            $this->escanear->lectorPara($fuente)->cabeceras(
+            $lector = $this->escanear->lectorPara($fuente);
+
+            /** @var list<string> $fallaron */
+            $fallaron = [];
+
+            $lector->cabeceras(
                 $fuente->ruta,
                 array_keys($porRuta),
-                function (string $ruta, ?string $cabecera) use ($porRuta, &$con, &$sin) {
-                    foreach ($porRuta[$ruta] ?? [] as $pista) {
-                        $segundos = $cabecera ? $this->segundosDe($cabecera, $pista->bytes) : null;
+                function (string $ruta, ?string $cabecera) use ($porRuta, &$con, &$sin, &$fallaron) {
+                    if ($cabecera === null) {
+                        $fallaron[] = $ruta;
 
-                        $cambios = ['duracion_revisada_en' => now()];
-
-                        if ($segundos) {
-                            $cambios['duracion_seg'] = $segundos;
-                            $con++;
-                        } else {
-                            $sin++;
-                        }
-
-                        /*
-                         * La marca se guarda SIEMPRE, con duración o sin ella.
-                         * Es la misma lección que dejaron las carátulas: sin
-                         * distinguir "sin revisar" de "revisada y no se pudo",
-                         * la consulta vuelve a elegir las mismas pistas en cada
-                         * tanda y el barrido nunca avanza.
-                         */
-                        $pista->forceFill($cambios)->save();
+                        return;
                     }
+
+                    $this->guardar($porRuta[$ruta] ?? [], $cabecera, $con, $sin);
                 },
                 self::CABECERA,
                 $paralelo,
             );
+
+            if ($fallaron !== []) {
+                /*
+                 * Segundo intento, de a uno. Casi todo lo que falla es la nube
+                 * que no contestó o el hosting que se quedó sin hilos: sin
+                 * competencia, la misma lectura suele salir bien.
+                 */
+                $lector->cabeceras(
+                    $fuente->ruta,
+                    $fallaron,
+                    function (string $ruta, ?string $cabecera) use ($porRuta, &$con, &$sin, &$ilegibles) {
+                        if ($cabecera === null) {
+                            $ilegibles += count($porRuta[$ruta] ?? []);
+
+                            return;
+                        }
+
+                        $this->guardar($porRuta[$ruta] ?? [], $cabecera, $con, $sin);
+                    },
+                    self::CABECERA,
+                    paralelo: 1,
+                );
+            }
         }
 
-        return ['con' => $con, 'sin' => $sin];
+        return ['con' => $con, 'sin' => $sin, 'ilegibles' => $ilegibles];
+    }
+
+    /**
+     * @param  list<Pista>  $pistas
+     */
+    private function guardar(array $pistas, string $cabecera, int &$con, int &$sin): void
+    {
+        foreach ($pistas as $pista) {
+            $segundos = $this->segundosDe($cabecera, $pista->bytes);
+
+            $cambios = ['duracion_revisada_en' => now()];
+
+            if ($segundos) {
+                $cambios['duracion_seg'] = $segundos;
+                $con++;
+            } else {
+                $sin++;
+            }
+
+            /*
+             * La marca se guarda leamos o no la duración, PERO sólo cuando el
+             * encabezado llegó. Son dos cosas distintas y confundirlas cuesta
+             * caro en las dos direcciones:
+             *
+             * - Si no se marcara lo que se leyó y no dio duración, la consulta
+             *   volvería a elegir esas pistas en cada tanda y el barrido giraría
+             *   sobre las primeras sin avanzar nunca. Eso ya pasó con las
+             *   carátulas.
+             * - Si se marcara lo que ni siquiera se pudo leer, un rato sin red
+             *   dejaría cientos de pistas dadas por revisadas y sin duración,
+             *   sin forma de distinguirlas de las que de verdad no la tienen.
+             */
+            $pista->forceFill($cambios)->save();
+        }
     }
 
     /**

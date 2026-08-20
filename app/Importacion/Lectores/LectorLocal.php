@@ -58,7 +58,7 @@ class LectorLocal implements LectorDeFuente
      * sino la hidratación del archivo, y lanzar cuatro a la vez sólo bajaría
      * cuatro archivos enteros en vez de uno.
      */
-    public function cabeceras(string $raiz, array $rutas, callable $alLlegar, int $bytes = 400000, int $paralelo = 4): void
+    public function cabeceras(string $raiz, array $rutas, callable $alLlegar, int $bytes = 400000, int $paralelo = 3): void
     {
         foreach ($rutas as $ruta) {
             $alLlegar($ruta, $this->cabecera($raiz, $ruta, $bytes));
