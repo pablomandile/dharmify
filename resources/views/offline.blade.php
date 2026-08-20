@@ -43,7 +43,7 @@
     </head>
     <body>
         <main>
-            <img src="/icons/icon-192.png?v=1" alt="">
+            <img src="/icons/icon-192.png?v=2" alt="">
             <h1>Sin conexión</h1>
             <p>No pudimos llegar al servidor. Lo que hayas guardado para escuchar
                sin conexión sigue disponible.</p>

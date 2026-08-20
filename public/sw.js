@@ -10,7 +10,7 @@
  *   2. el ?v= de los <link rel="icon"> del blade
  *   3. el ?v= de los "src" del manifest
  */
-const CACHE_APP = 'dharmify-app-v1';
+const CACHE_APP = 'dharmify-app-v2';
 
 /*
  * La caché del audio NO lleva número de versión, a propósito, y el `activate` de
