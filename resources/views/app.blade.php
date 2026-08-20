@@ -4,6 +4,10 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
+        {{-- Lo usan los fetch() del reproductor, que no pasan por Inertia y por
+             lo tanto no llevan el header que este pone solo. --}}
+        <meta name="csrf-token" content="{{ csrf_token() }}">
+
         {{-- Inline script to detect system dark mode preference and apply it immediately --}}
         <script>
             (function() {

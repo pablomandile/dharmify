@@ -109,7 +109,12 @@ class BibliotecaController extends Controller
                     'duracion_seg' => $p->duracion_seg,
                     'bytes' => $p->bytes,
                     'grabada_el' => $p->grabada_el?->format('d/m/Y'),
-                    'en_server' => $p->en_server,
+                    /*
+                     * El estado real del disco, no la columna: la purga borra
+                     * archivos sin pasar por el modelo, así que `en_server`
+                     * puede estar desactualizada y la pastilla mentiría.
+                     */
+                    'en_server' => is_file(storage_path('app/private/audio/'.$p->clave.'.mp3')),
                     'en_nube' => $p->en_nube,
                 ]),
         ]);

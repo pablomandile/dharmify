@@ -168,5 +168,29 @@
     }
     body {
         @apply bg-background text-foreground;
+
+        /*
+         * Un resplandor celeste arriba y otro más tenue abajo a la derecha.
+         *
+         * `fixed` a propósito: si se desplazara con el contenido, en una lista
+         * larga como la biblioteca el degradé desaparecería enseguida y sólo se
+         * vería en la primera pantalla.
+         *
+         * Van con los tokens del tema, así que el mismo código sirve en claro y
+         * en oscuro sin duplicar reglas: lo único que cambia es el celeste.
+         */
+        background-image:
+            radial-gradient(
+                900px 480px at 50% -12%,
+                color-mix(in oklab, var(--primary) 14%, transparent),
+                transparent 70%
+            ),
+            radial-gradient(
+                700px 400px at 110% 110%,
+                color-mix(in oklab, var(--primary) 8%, transparent),
+                transparent 70%
+            );
+        background-attachment: fixed;
+        background-repeat: no-repeat;
     }
 }

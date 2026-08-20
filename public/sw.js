@@ -21,7 +21,69 @@ const CACHE_APP = 'dharmify-app-v2';
  * por wifi. La llena la página (no el service worker) y se usa en la fase de
  * offline; se declara desde ahora para que el filtro del activate nazca bien.
  */
-const CACHE_AUDIO = 'dharmify-audio-v1'; // eslint-disable-line no-unused-vars
+const CACHE_AUDIO = 'dharmify-audio-v1';
+
+/**
+ * Sirve un audio guardado en el dispositivo, armando el 206 a mano.
+ *
+ * Acá está la trampa que más tiempo come. Guardar el archivo en Cache Storage
+ * es fácil; el problema es que una entrada de caché devuelve SIEMPRE el archivo
+ * entero con 200, y el <audio> pide rangos de bytes para arrancar y para cada
+ * salto de la barra. Resultado: suena, pero no se puede adelantar.
+ */
+async function servirAudio(request) {
+    const cache = await caches.open(CACHE_AUDIO);
+    const guardado = await cache.match(request.url, { ignoreSearch: true });
+
+    // No está guardado en este dispositivo: que vaya al servidor como siempre.
+    if (!guardado) {
+        return fetch(request);
+    }
+
+    const rango = request.headers.get('range');
+    const blob = await guardado.blob();
+
+    if (!rango) {
+        return new Response(blob, {
+            status: 200,
+            headers: {
+                'Content-Type': 'audio/mpeg',
+                'Content-Length': String(blob.size),
+                'Accept-Ranges': 'bytes',
+            },
+        });
+    }
+
+    const m = /bytes=(\d*)-(\d*)/.exec(rango);
+    let inicio = m && m[1] !== '' ? parseInt(m[1], 10) : 0;
+    let fin = m && m[2] !== '' ? parseInt(m[2], 10) : blob.size - 1;
+
+    if (m && m[1] === '' && m[2] !== '') {
+        // "bytes=-500": los últimos N bytes.
+        inicio = Math.max(0, blob.size - parseInt(m[2], 10));
+        fin = blob.size - 1;
+    }
+
+    if (inicio >= blob.size || inicio > fin) {
+        return new Response(null, {
+            status: 416,
+            headers: { 'Content-Range': 'bytes */' + blob.size },
+        });
+    }
+
+    // slice() no carga los 25 MB en memoria: devuelve una vista del blob.
+    const trozo = blob.slice(inicio, fin + 1);
+
+    return new Response(trozo, {
+        status: 206,
+        headers: {
+            'Content-Type': 'audio/mpeg',
+            'Content-Length': String(trozo.size),
+            'Content-Range': 'bytes ' + inicio + '-' + fin + '/' + blob.size,
+            'Accept-Ranges': 'bytes',
+        },
+    });
+}
 
 const OFFLINE_URL = '/sin-conexion';
 
@@ -75,6 +137,16 @@ self.addEventListener('fetch', (event) => {
      * no sabe manejar una mentira.
      */
     if (url.pathname.startsWith('/api/')) return;
+
+    // El audio guardado se sirve desde el dispositivo, con su 206 sintetizado.
+    if (/^\/pistas\/\d+\/audio$/.test(url.pathname)) {
+        event.respondWith(servirAudio(request));
+
+        return;
+    }
+
+    // La descarga del mp3 va siempre al servidor, nunca a la caché.
+    if (/^\/pistas\/\d+\/bajar$/.test(url.pathname)) return;
 
     // Los assets de Vite llevan el hash en el nombre: si la URL existe, el
     // contenido no cambió nunca. Servirlos de caché es seguro y es lo único que

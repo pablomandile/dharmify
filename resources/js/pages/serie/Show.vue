@@ -1,7 +1,20 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft, Cloud, HardDrive, Music } from '@lucide/vue';
+import {
+    ArrowLeft,
+    Check,
+    Cloud,
+    Download,
+    HardDrive,
+    Loader2,
+    Pause,
+    Play,
+    Smartphone,
+} from '@lucide/vue';
+import { computed, onMounted } from 'vue';
 import { Badge } from '@/components/ui/badge';
+import { useOffline } from '@/composables/useOffline';
+import { useReproductor } from '@/composables/useReproductor';
 
 type Pista = {
     id: number;
@@ -32,6 +45,39 @@ defineOptions({
     },
 });
 
+const { actual, sonando, avisos, enServer, cola, reproducir, alternar } =
+    useReproductor();
+const { guardadas, progreso, revisar, guardar, borrar } = useOffline();
+
+onMounted(revisar);
+
+const paraReproducir = (p: Pista) => ({
+    id: p.id,
+    titulo: p.titulo,
+    serie: props.serie.titulo,
+    serieId: props.serie.id,
+    en_server: p.en_server,
+    en_nube: p.en_nube,
+});
+
+const tocar = (p: Pista) => {
+    // La cola es la serie entera: al terminar una charla sigue la que va, que
+    // es como se escucha un retiro.
+    cola.value = props.pistas.map(paraReproducir);
+
+    if (actual.value?.id === p.id) {
+        alternar();
+
+        return;
+    }
+
+    reproducir(paraReproducir(p));
+};
+
+const estaSonando = (p: Pista) => actual.value?.id === p.id && sonando.value;
+const esActual = (p: Pista) => actual.value?.id === p.id;
+const estaEnServer = (p: Pista) => p.en_server || enServer[p.id] === true;
+
 const etiquetaTipo: Record<string, string> = {
     retiro: 'Retiro',
     curso: 'Curso',
@@ -58,7 +104,9 @@ const duracion = (segundos: number | null) => {
     return h ? `${h} h ${m} min` : `${m} min`;
 };
 
-const pesoTotal = props.pistas.reduce((suma, p) => suma + p.bytes, 0);
+const pesoTotal = computed(() =>
+    props.pistas.reduce((suma, p) => suma + p.bytes, 0),
+);
 </script>
 
 <template>
@@ -73,82 +121,173 @@ const pesoTotal = props.pistas.reduce((suma, p) => suma + p.bytes, 0);
             Volver a la biblioteca
         </Link>
 
-        <div>
-            <div class="flex flex-wrap items-center gap-2">
-                <Badge v-if="serie.tipo" variant="secondary">
-                    {{ etiquetaTipo[serie.tipo] ?? serie.tipo }}
-                </Badge>
-                <Badge v-if="serie.anio" variant="outline">{{
-                    serie.anio
-                }}</Badge>
-                <Badge v-if="serie.idioma === 'en'" variant="outline"
-                    >Inglés</Badge
-                >
+        <div class="flex flex-col gap-5 sm:flex-row sm:items-end">
+            <!-- La carátula, sacada del primer audio de la serie. -->
+            <div
+                class="relative aspect-square w-40 shrink-0 overflow-hidden rounded-xl border bg-linear-to-br from-primary/25 via-primary/5 to-transparent"
+            >
+                <img
+                    :src="`/series/${serie.id}/portada`"
+                    alt=""
+                    class="size-full object-cover"
+                    onerror="this.style.display = 'none'"
+                />
             </div>
 
-            <h1 class="mt-2 text-2xl font-semibold">{{ serie.titulo }}</h1>
+            <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                    <Badge v-if="serie.tipo" variant="secondary">
+                        {{ etiquetaTipo[serie.tipo] ?? serie.tipo }}
+                    </Badge>
+                    <Badge v-if="serie.anio" variant="outline">
+                        {{ serie.anio }}
+                    </Badge>
+                    <Badge v-if="serie.idioma === 'en'" variant="outline">
+                        Inglés
+                    </Badge>
+                </div>
 
-            <p v-if="serie.maestros.length" class="mt-1 text-muted-foreground">
-                {{ serie.maestros.map((m) => m.nombre).join(' · ') }}
-            </p>
+                <h1 class="mt-2 text-2xl font-semibold">{{ serie.titulo }}</h1>
 
-            <p class="mt-2 text-sm text-muted-foreground">
-                {{ pistas.length }}
-                {{ pistas.length === 1 ? 'audio' : 'audios' }} ·
-                {{ enMegas(pesoTotal) }}
-            </p>
+                <p
+                    v-if="serie.maestros.length"
+                    class="mt-1 text-muted-foreground"
+                >
+                    {{ serie.maestros.map((m) => m.nombre).join(' · ') }}
+                </p>
 
-            <!--
-                El nombre original de la carpeta, que suele traer sede, semana o
-                el evento completo: datos que el título ya no muestra y que a
-                veces son la única forma de reconocer una grabación.
-            -->
-            <p class="mt-3 font-mono text-xs text-muted-foreground/70">
-                {{ serie.carpeta }}
-            </p>
+                <p class="mt-2 text-sm text-muted-foreground">
+                    {{ pistas.length }}
+                    {{ pistas.length === 1 ? 'audio' : 'audios' }} ·
+                    {{ enMegas(pesoTotal) }}
+                </p>
+
+                <!--
+                    El nombre original de la carpeta, que suele traer sede, semana
+                    o el evento completo: datos que el título ya no muestra y que
+                    a veces son la única forma de reconocer una grabación.
+                -->
+                <p class="mt-3 font-mono text-xs text-muted-foreground/70">
+                    {{ serie.carpeta }}
+                </p>
+            </div>
         </div>
 
-        <div class="divide-y rounded-lg border">
+        <div class="divide-y overflow-hidden rounded-xl border">
             <div
                 v-for="(pista, i) in pistas"
                 :key="pista.id"
-                class="flex items-center gap-3 px-4 py-3"
+                class="flex items-center gap-3 px-3 py-2.5 transition-colors"
+                :class="
+                    esActual(pista) ? 'bg-primary/10' : 'hover:bg-accent/40'
+                "
             >
+                <button
+                    class="grid size-9 shrink-0 place-items-center rounded-full border transition-colors"
+                    :class="
+                        esActual(pista)
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'hover:border-primary hover:text-primary'
+                    "
+                    :aria-label="
+                        estaSonando(pista)
+                            ? 'Pausar'
+                            : `Reproducir ${pista.titulo}`
+                    "
+                    @click="tocar(pista)"
+                >
+                    <Loader2
+                        v-if="avisos[pista.id] === 'Trayendo de la nube…'"
+                        class="size-4 animate-spin"
+                    />
+                    <Pause v-else-if="estaSonando(pista)" class="size-4" />
+                    <Play v-else class="size-4" />
+                </button>
+
                 <span
-                    class="w-6 shrink-0 text-right text-sm text-muted-foreground"
+                    class="w-5 shrink-0 text-right text-xs text-muted-foreground tabular-nums"
                 >
                     {{ i + 1 }}
                 </span>
 
-                <Music class="size-4 shrink-0 text-muted-foreground" />
-
-                <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm">{{ pista.titulo }}</p>
-                    <p class="text-xs text-muted-foreground">
-                        <template v-if="pista.grabada_el">
-                            {{ pista.grabada_el }} ·
-                        </template>
-                        <template v-if="duracion(pista.duracion_seg)">
-                            {{ duracion(pista.duracion_seg) }} ·
-                        </template>
-                        {{ enMegas(pista.bytes) }}
+                <button class="min-w-0 flex-1 text-left" @click="tocar(pista)">
+                    <p
+                        class="truncate text-sm"
+                        :class="esActual(pista) && 'font-medium text-primary'"
+                    >
+                        {{ pista.titulo }}
                     </p>
-                </div>
+                    <p class="truncate text-xs text-muted-foreground">
+                        <template v-if="avisos[pista.id]">
+                            {{ avisos[pista.id] }}
+                        </template>
+                        <template v-else-if="progreso[pista.id]">
+                            Guardando… {{ progreso[pista.id] }}
+                        </template>
+                        <template v-else>
+                            <template v-if="pista.grabada_el">
+                                {{ pista.grabada_el }} ·
+                            </template>
+                            <template v-if="duracion(pista.duracion_seg)">
+                                {{ duracion(pista.duracion_seg) }} ·
+                            </template>
+                            {{ enMegas(pista.bytes) }}
+                        </template>
+                    </p>
+                </button>
 
                 <!--
-                    Dónde está el archivo. Se muestra porque cambia lo que pasa
-                    al darle play: lo que está en el servidor arranca al toque,
-                    lo que sólo está en la nube hay que traerlo primero.
+                    Dónde está el archivo. Cambia lo que pasa al darle play: lo
+                    que está en el servidor arranca al toque; lo que sólo está en
+                    la nube se trae primero, y la pastilla pasa a "En el server"
+                    sin recargar la página.
                 -->
                 <span
-                    class="shrink-0 text-muted-foreground"
-                    :title="
-                        pista.en_server ? 'Listo en el servidor' : 'En la nube'
+                    class="hidden shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] sm:inline-flex"
+                    :class="
+                        estaEnServer(pista)
+                            ? 'border-primary/40 text-primary'
+                            : 'text-muted-foreground'
                     "
                 >
-                    <HardDrive v-if="pista.en_server" class="size-4" />
-                    <Cloud v-else class="size-4" />
+                    <HardDrive v-if="estaEnServer(pista)" class="size-3" />
+                    <Cloud v-else class="size-3" />
+                    {{ estaEnServer(pista) ? 'En el server' : 'En la nube' }}
                 </span>
+
+                <div class="flex shrink-0 items-center gap-0.5">
+                    <button
+                        class="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        :class="guardadas.has(pista.id) && 'text-primary'"
+                        :title="
+                            guardadas.has(pista.id)
+                                ? 'Guardado en este dispositivo — tocá para quitarlo'
+                                : 'Guardar en este dispositivo para escuchar sin conexión'
+                        "
+                        :aria-label="
+                            guardadas.has(pista.id)
+                                ? 'Quitar de este dispositivo'
+                                : 'Guardar para escuchar sin conexión'
+                        "
+                        @click="
+                            guardadas.has(pista.id)
+                                ? borrar(pista.id)
+                                : guardar(pista.id)
+                        "
+                    >
+                        <Check v-if="guardadas.has(pista.id)" class="size-4" />
+                        <Smartphone v-else class="size-4" />
+                    </button>
+
+                    <a
+                        :href="`/pistas/${pista.id}/bajar`"
+                        class="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        title="Descargar el audio"
+                        aria-label="Descargar"
+                    >
+                        <Download class="size-4" />
+                    </a>
+                </div>
             </div>
         </div>
     </div>

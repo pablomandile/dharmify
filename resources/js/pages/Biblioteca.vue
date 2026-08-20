@@ -222,41 +222,65 @@ const etiquetaTipo: Record<string, string> = {
                 v-for="serie in series.data"
                 :key="serie.id"
                 :href="`/series/${serie.id}`"
-                class="group rounded-lg border p-4 transition-colors hover:border-primary/60 hover:bg-accent/40"
+                class="group overflow-hidden rounded-xl border transition-colors hover:border-primary/60 hover:bg-accent/30"
             >
-                <div class="flex items-start justify-between gap-2">
-                    <h2 class="font-medium group-hover:text-primary">
-                        {{ serie.titulo }}
-                    </h2>
+                <!--
+                    La carátula sale del primer audio de la serie. Sólo 1 de cada
+                    3 grabaciones la trae embebida, así que el degradé de abajo no
+                    es decorativo: es lo que ve la mayoría, y evita que la grilla
+                    quede llena de huecos grises.
+                -->
+                <div
+                    class="relative aspect-16/10 overflow-hidden bg-linear-to-br from-primary/30 via-primary/10 to-transparent"
+                >
+                    <img
+                        :src="`/series/${serie.id}/portada`"
+                        alt=""
+                        loading="lazy"
+                        class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                        onerror="this.style.display = 'none'"
+                    />
+
+                    <!-- Despega el año del dibujo sin taparlo. -->
+                    <div
+                        class="pointer-events-none absolute inset-x-0 top-0 h-16 bg-linear-to-b from-black/55 to-transparent"
+                    />
+
                     <Badge
                         v-if="serie.anio"
                         variant="secondary"
-                        class="shrink-0"
+                        class="absolute top-2 right-2"
                     >
                         {{ serie.anio }}
                     </Badge>
                 </div>
 
-                <p
-                    v-if="serie.maestros.length"
-                    class="mt-1 text-sm text-muted-foreground"
-                >
-                    {{ serie.maestros.map((m) => m.nombre).join(' · ') }}
-                </p>
+                <div class="p-4">
+                    <h2 class="font-medium group-hover:text-primary">
+                        {{ serie.titulo }}
+                    </h2>
 
-                <div
-                    class="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
-                >
-                    <Badge v-if="serie.tipo" variant="outline">
-                        {{ etiquetaTipo[serie.tipo] ?? serie.tipo }}
-                    </Badge>
-                    <span
-                        >{{ serie.pistas }}
-                        {{ serie.pistas === 1 ? 'audio' : 'audios' }}</span
+                    <p
+                        v-if="serie.maestros.length"
+                        class="mt-1 text-sm text-muted-foreground"
                     >
-                    <Badge v-if="serie.idioma === 'en'" variant="outline">
-                        Inglés
-                    </Badge>
+                        {{ serie.maestros.map((m) => m.nombre).join(' · ') }}
+                    </p>
+
+                    <div
+                        class="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+                    >
+                        <Badge v-if="serie.tipo" variant="outline">
+                            {{ etiquetaTipo[serie.tipo] ?? serie.tipo }}
+                        </Badge>
+                        <span
+                            >{{ serie.pistas }}
+                            {{ serie.pistas === 1 ? 'audio' : 'audios' }}</span
+                        >
+                        <Badge v-if="serie.idioma === 'en'" variant="outline">
+                            Inglés
+                        </Badge>
+                    </div>
                 </div>
             </Link>
         </div>
