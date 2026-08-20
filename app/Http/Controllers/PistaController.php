@@ -3,12 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Importacion\EscanearFuente;
+use App\Importacion\NormalizarImagen;
 use App\Models\Fuente;
 use App\Models\Pista;
 use App\Models\Serie;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
@@ -154,6 +158,49 @@ class PistaController extends Controller
         }
 
         return $this->enviar($archivo, descargar: true, nombre: $pista->archivo);
+    }
+
+    /**
+     * Cambiar la carátula de una serie a mano.
+     *
+     * Existe porque la mayoría de estas grabaciones no trae imagen en ningún
+     * lado: de 145 series, 62 quedaron con una carátula dibujada por nosotros.
+     * Poner la buena tiene que ser cuestión de elegir un archivo.
+     *
+     * Queda marcada como `manual`, que es lo que la protege: ningún barrido
+     * posterior la pisa, porque es la única imagen que alguien eligió a propósito.
+     */
+    public function subirPortada(Request $request, Serie $serie, NormalizarImagen $normalizar): RedirectResponse
+    {
+        abort_unless($this->fuentesVisibles()->contains($serie->fuente_id), 404);
+
+        $request->validate([
+            'imagen' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
+        ], [
+            'imagen.image' => 'El archivo tiene que ser una imagen.',
+            'imagen.mimes' => 'Tiene que ser un jpg, un png o un webp.',
+            'imagen.max' => 'La imagen no puede pesar más de 8 MB.',
+        ]);
+
+        $archivo = $request->file('imagen');
+        $jpg = $archivo instanceof UploadedFile
+            ? $normalizar((string) file_get_contents($archivo->getRealPath()))
+            : null;
+
+        if ($jpg === null) {
+            return back()->withErrors(['imagen' => 'No pude leer esa imagen. Probá con otra.']);
+        }
+
+        $ruta = 'portadas/serie-'.$serie->id.'.jpg';
+        Storage::disk('local')->put($ruta, $jpg);
+
+        $serie->forceFill([
+            'portada' => $ruta,
+            'portada_origen' => Serie::PORTADA_MANUAL,
+            'portada_revisada_en' => now(),
+        ])->save();
+
+        return back()->with('estado', 'Carátula actualizada.');
     }
 
     public function portada(Serie $serie): StreamedResponse|JsonResponse

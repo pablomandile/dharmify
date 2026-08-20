@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +22,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $anio
  * @property string $idioma
  * @property bool $editada_a_mano
+ * @property string|null $portada
+ * @property string|null $portada_origen
+ * @property CarbonImmutable|null $portada_revisada_en
  *
  * Lo que agrega `withSum('pistas', 'duracion_seg')` en la biblioteca. Va acá
  * por lo mismo que las columnas: es una propiedad real que ningún analizador
@@ -29,10 +33,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 #[Fillable([
     'fuente_id', 'carpeta', 'carpeta_hash', 'titulo', 'slug',
-    'tipo', 'anio', 'idioma', 'portada', 'portada_revisada_en', 'editada_a_mano',
+    'tipo', 'anio', 'idioma', 'portada', 'portada_revisada_en', 'portada_origen', 'editada_a_mano',
 ])]
 class Serie extends Model
 {
+    /** Del flyer de la carpeta o del encabezado de un audio. */
+    public const PORTADA_ARCHIVO = 'archivo';
+
+    /** Dibujada por nosotros porque no existe ninguna imagen de la serie. */
+    public const PORTADA_GENERADA = 'generada';
+
+    /** Subida por una persona. No la pisa ningún barrido. */
+    public const PORTADA_MANUAL = 'manual';
+
     protected $table = 'series';
 
     protected function casts(): array
@@ -42,6 +55,24 @@ class Serie extends Model
             'editada_a_mano' => 'boolean',
             'portada_revisada_en' => 'datetime',
         ];
+    }
+
+    /**
+     * La URL de la carátula, con la versión pegada.
+     *
+     * El `?v=` no es adorno: la carátula se sirve con una semana de caché, así
+     * que sin él, cambiarla a mano no se vería hasta dentro de siete días.
+     */
+    public function urlPortada(): ?string
+    {
+        if (! $this->portada) {
+            return null;
+        }
+
+        // Los tres caminos que escriben una carátula —el barrido, el generador
+        // y la subida a mano— guardan la marca en el mismo save, así que si hay
+        // imagen hay fecha.
+        return '/series/'.$this->id.'/portada?v='.$this->portada_revisada_en->timestamp;
     }
 
     /**

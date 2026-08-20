@@ -70,6 +70,7 @@ class BibliotecaController extends Controller
                 'tipo' => $s->tipo,
                 'anio' => $s->anio,
                 'idioma' => $s->idioma,
+                'portada' => $s->urlPortada(),
                 'pistas' => $s->pistas_count,
                 'segundos' => $s->pistas_count > 0 && $s->pistas_medidas_count === $s->pistas_count
                     ? (int) $s->pistas_sum_duracion_seg
@@ -109,6 +110,8 @@ class BibliotecaController extends Controller
                 'tipo' => $serie->tipo,
                 'anio' => $serie->anio,
                 'idioma' => $serie->idioma,
+                'portada' => $serie->urlPortada(),
+                'portada_origen' => $serie->portada_origen,
                 'maestros' => $serie->maestros->map(fn (Maestro $m) => ['nombre' => $m->nombre, 'slug' => $m->slug]),
             ],
             'pistas' => $serie->pistas()

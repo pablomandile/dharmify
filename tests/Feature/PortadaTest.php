@@ -5,9 +5,12 @@ namespace Tests\Feature;
 use App\Importacion\ArchivoEnLaFuente;
 use App\Importacion\EscanearFuente;
 use App\Importacion\ExtraerPortada;
+use App\Importacion\GenerarPortada;
 use App\Models\Fuente;
 use App\Models\Serie;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -151,6 +154,98 @@ class PortadaTest extends TestCase
 
         $this->assertNotFalse($medidas);
         $this->assertSame(300, $medidas[0], 'eligió la foto grande en vez de la que se llama portada');
+    }
+
+    public function test_dibuja_una_caratula_cuando_no_hay_ninguna_imagen(): void
+    {
+        app(EscanearFuente::class)($this->fuente());
+
+        $serie = Serie::firstOrFail();
+
+        app(GenerarPortada::class)($serie);
+
+        $serie->refresh();
+
+        $this->assertSame(Serie::PORTADA_GENERADA, $serie->portada_origen);
+        Storage::disk('local')->assertExists((string) $serie->portada);
+
+        $medidas = getimagesizefromstring((string) Storage::disk('local')->get((string) $serie->portada));
+
+        $this->assertNotFalse($medidas);
+        $this->assertSame([1200, 1200], [$medidas[0], $medidas[1]]);
+        $this->assertSame('image/jpeg', $medidas['mime']);
+    }
+
+    /** El mismo título tiene que dar siempre el mismo color, o la grilla bailaría. */
+    public function test_el_color_de_la_generica_sale_del_titulo(): void
+    {
+        app(EscanearFuente::class)($this->fuente());
+
+        $serie = Serie::firstOrFail();
+
+        app(GenerarPortada::class)($serie);
+        $primera = (string) Storage::disk('local')->get((string) $serie->refresh()->portada);
+
+        app(GenerarPortada::class)($serie);
+        $segunda = (string) Storage::disk('local')->get((string) $serie->refresh()->portada);
+
+        $this->assertSame($primera, $segunda);
+    }
+
+    /**
+     * La regla que protege el trabajo de una persona: lo que se sube a mano no
+     * lo pisa ningún barrido, ni siquiera cuando encuentra una imagen "mejor".
+     */
+    public function test_la_caratula_subida_a_mano_gana_y_no_la_pisa_el_barrido(): void
+    {
+        $this->jpg('CDA 2013.jpg');
+
+        app(EscanearFuente::class)($this->fuente());
+
+        $serie = Serie::firstOrFail();
+        $admin = User::factory()->create(['rol' => User::ROL_ADMIN]);
+
+        $subida = $this->raiz.'/subida.png';
+        $imagen = imagecreatetruecolor(500, 500);
+        imagefilledrectangle($imagen, 0, 0, 500, 500, (int) imagecolorallocate($imagen, 12, 180, 240));
+        imagepng($imagen, $subida);
+        imagedestroy($imagen);
+
+        $this->actingAs($admin)
+            ->post("/series/{$serie->id}/portada", [
+                'imagen' => new UploadedFile($subida, 'subida.png', 'image/png', test: true),
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $serie->refresh();
+
+        $this->assertSame(Serie::PORTADA_MANUAL, $serie->portada_origen);
+
+        // Un png subido se guarda como jpg: la carátula se sirve siempre como
+        // image/jpeg y el nombre no puede mentir sobre el contenido.
+        $guardada = (string) Storage::disk('local')->get((string) $serie->portada);
+        $this->assertSame("\xFF\xD8\xFF", substr($guardada, 0, 3));
+
+        $this->artisan('dharma:portadas', ['--todas' => true])->assertSuccessful();
+
+        $this->assertSame(
+            $guardada,
+            (string) Storage::disk('local')->get((string) $serie->refresh()->portada),
+            'el barrido pisó una carátula que alguien puso a propósito',
+        );
+    }
+
+    public function test_solo_el_administrador_puede_cambiar_la_caratula(): void
+    {
+        app(EscanearFuente::class)($this->fuente());
+
+        $serie = Serie::firstOrFail();
+        $invitado = User::factory()->create(['rol' => User::ROL_INVITADO]);
+
+        $this->actingAs($invitado)
+            ->post("/series/{$serie->id}/portada", [])
+            ->assertNotFound();
     }
 
     public function test_marca_la_serie_aunque_no_haya_imagen_en_ningun_lado(): void

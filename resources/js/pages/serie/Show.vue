@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     ArrowLeft,
     Check,
@@ -8,11 +8,13 @@ import {
     HardDrive,
     Loader2,
     Pause,
+    ImageUp,
     Play,
     Smartphone,
 } from '@lucide/vue';
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useOffline } from '@/composables/useOffline';
 import { useReproductor } from '@/composables/useReproductor';
 
@@ -34,6 +36,8 @@ const props = defineProps<{
         tipo: string | null;
         anio: number | null;
         idioma: string;
+        portada: string | null;
+        portada_origen: string | null;
         maestros: { nombre: string; slug: string }[];
     };
     pistas: Pista[];
@@ -104,6 +108,52 @@ const duracion = (segundos: number | null) => {
     return h ? `${h} h ${m} min` : `${m} min`;
 };
 
+/*
+ * Cambiar la carátula.
+ *
+ * Sólo el administrador: es el catálogo compartido, no una preferencia de cada
+ * persona. La imagen queda marcada como puesta a mano y ningún barrido posterior
+ * la reemplaza.
+ */
+const page = usePage();
+const esAdmin = computed(() => page.props.auth?.esAdmin === true);
+const errors = computed(
+    () => (page.props.errors ?? {}) as Record<string, string>,
+);
+
+const archivo = ref<HTMLInputElement | null>(null);
+const subiendo = ref(false);
+
+const elegirPortada = () => archivo.value?.click();
+
+const subirPortada = (evento: Event) => {
+    const elegido = (evento.target as HTMLInputElement).files?.[0];
+
+    if (!elegido) {
+        return;
+    }
+
+    subiendo.value = true;
+
+    router.post(
+        `/series/${props.serie.id}/portada`,
+        { imagen: elegido },
+        {
+            forceFormData: true,
+            preserveScroll: true,
+            onFinish: () => {
+                subiendo.value = false;
+
+                // Sin esto, elegir el mismo archivo dos veces seguidas no
+                // dispara el evento y parece que el botón dejó de andar.
+                if (archivo.value) {
+                    archivo.value.value = '';
+                }
+            },
+        },
+    );
+};
+
 const pesoTotal = computed(() =>
     props.pistas.reduce((suma, p) => suma + p.bytes, 0),
 );
@@ -132,16 +182,55 @@ const duracionTotal = computed(() =>
         </Link>
 
         <div class="flex flex-col gap-5 sm:flex-row sm:items-end">
-            <!-- La carátula, sacada del primer audio de la serie. -->
-            <div
-                class="relative aspect-square w-40 shrink-0 overflow-hidden rounded-xl border bg-linear-to-br from-primary/25 via-primary/5 to-transparent"
-            >
-                <img
-                    :src="`/series/${serie.id}/portada`"
-                    alt=""
-                    class="size-full object-cover"
-                    onerror="this.style.display = 'none'"
-                />
+            <!--
+                La carátula: el flyer de la carpeta, la imagen embebida en un
+                audio, o una que dibujamos nosotros cuando no existe ninguna.
+            -->
+            <div class="w-40 shrink-0 space-y-2">
+                <div
+                    class="relative aspect-square overflow-hidden rounded-xl border bg-linear-to-br from-primary/25 via-primary/5 to-transparent"
+                >
+                    <img
+                        v-if="serie.portada"
+                        :src="serie.portada"
+                        alt=""
+                        class="size-full object-cover"
+                        onerror="this.style.display = 'none'"
+                    />
+                </div>
+
+                <template v-if="esAdmin">
+                    <input
+                        ref="archivo"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        class="hidden"
+                        @change="subirPortada"
+                    />
+
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        class="w-full"
+                        :disabled="subiendo"
+                        @click="elegirPortada"
+                    >
+                        <Loader2 v-if="subiendo" class="size-4 animate-spin" />
+                        <ImageUp v-else class="size-4" />
+                        {{ subiendo ? 'Subiendo…' : 'Cambiar carátula' }}
+                    </Button>
+
+                    <p v-if="errors.imagen" class="text-xs text-destructive">
+                        {{ errors.imagen }}
+                    </p>
+                    <p
+                        v-else-if="serie.portada_origen === 'generada'"
+                        class="text-xs text-muted-foreground"
+                    >
+                        Esta serie no trae imagen propia: la carátula la
+                        dibujamos nosotros.
+                    </p>
+                </template>
             </div>
 
             <div class="min-w-0">

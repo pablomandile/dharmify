@@ -16,6 +16,7 @@ type Serie = {
     tipo: string | null;
     anio: number | null;
     idioma: string;
+    portada: string | null;
     pistas: number;
     segundos: number | null;
     maestros: Maestro[];
@@ -250,7 +251,8 @@ const etiquetaTipo: Record<string, string> = {
                     class="relative aspect-16/10 overflow-hidden bg-linear-to-br from-primary/30 via-primary/10 to-transparent"
                 >
                     <img
-                        :src="`/series/${serie.id}/portada`"
+                        v-if="serie.portada"
+                        :src="serie.portada"
                         alt=""
                         loading="lazy"
                         class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"

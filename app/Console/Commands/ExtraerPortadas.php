@@ -41,11 +41,20 @@ class ExtraerPortadas extends Command
              * no entraban: esas series quedaron marcadas y sin imagen, y hay que
              * poder volver sobre ellas sin releer las 145.
              */
-            ->when($this->option('sin-portada'), fn ($q) => $q->whereNull('portada')->whereNotNull('portada_revisada_en'))
+            ->when(
+                $this->option('sin-portada'),
+                fn ($q) => $q->whereNotNull('portada_revisada_en')
+                    ->where(fn ($q) => $q->whereNull('portada')->orWhere('portada_origen', Serie::PORTADA_GENERADA)),
+            )
             ->when(
                 ! $this->option('todas') && ! $this->option('sin-portada'),
                 fn ($q) => $q->whereNull('portada_revisada_en'),
             )
+            /*
+             * Lo que subió una persona no lo pisa ningún barrido, en ningún
+             * modo. Es la única imagen que alguien eligió a propósito.
+             */
+            ->where(fn ($q) => $q->whereNull('portada_origen')->orWhere('portada_origen', '!=', Serie::PORTADA_MANUAL))
             ->has('pistas')
             ->orderBy($this->option('sin-portada') ? 'portada_revisada_en' : 'id')
             ->limit((int) $this->option('limite'))

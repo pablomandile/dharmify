@@ -47,6 +47,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('series/{serie}/portada', [PistaController::class, 'portada'])->name('series.portada');
 
     /*
+     * Cambiar la carátula a mano. Sólo el administrador: es el catálogo, no una
+     * preferencia de cada persona.
+     */
+    Route::post('series/{serie}/portada', [PistaController::class, 'subirPortada'])
+        ->middleware('admin')
+        ->name('series.portada.subir');
+
+    /*
      * El audio. Va fuera del docroot y pasa por acá, que valida la sesión antes
      * de mandar un solo byte.
      */

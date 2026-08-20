@@ -52,10 +52,10 @@ class ExtraerPortada
     /** Una imagen suelta más grande que esto no es un flyer, es una foto en crudo. */
     private const IMAGEN_MAXIMA = 12000000;
 
-    /** El lado más largo de la carátula guardada. Alcanza y sobra para la grilla. */
-    private const LADO_MAXIMO = 1400;
-
-    public function __construct(private readonly EscanearFuente $escanear) {}
+    public function __construct(
+        private readonly EscanearFuente $escanear,
+        private readonly NormalizarImagen $normalizar,
+    ) {}
 
     /**
      * @param  list<ArchivoEnLaFuente>  $imagenesDeLaCarpeta  las que ya listó quien llama
@@ -72,12 +72,17 @@ class ExtraerPortada
             $ruta = self::CARPETA.'/serie-'.$serie->id.'.jpg';
             Storage::disk(self::DISCO)->put($ruta, $imagen);
             $cambios['portada'] = $ruta;
+            $cambios['portada_origen'] = Serie::PORTADA_ARCHIVO;
         }
 
         /*
          * La marca de revisión se guarda SIEMPRE, haya imagen o no. Sin eso, una
          * serie cuyo audio no trae carátula vuelve a la cola en cada tanda y el
          * trabajo nunca avanza más allá de las primeras.
+         *
+         * Lo que NO se hace es borrar la carátula anterior cuando no se encontró
+         * nada: puede haber una dibujada por nosotros ocupando ese lugar, y
+         * dejar la ficha en blanco sería peor que dejar la genérica.
          */
         $serie->forceFill($cambios)->save();
 
@@ -107,7 +112,7 @@ class ExtraerPortada
             $elegida->bytes + 1024,
         );
 
-        return $bytes === null ? null : $this->normalizar($bytes);
+        return $bytes === null ? null : ($this->normalizar)($bytes);
     }
 
     /**
@@ -164,7 +169,7 @@ class ExtraerPortada
             $imagen = $this->imagenDe($cabecera);
 
             if ($imagen !== null) {
-                return $this->normalizar($imagen);
+                return ($this->normalizar)($imagen);
             }
         }
 
@@ -198,51 +203,6 @@ class ExtraerPortada
             return null;
         } finally {
             @unlink($temporal);
-        }
-    }
-
-    /**
-     * Deja todo como un jpg de tamaño razonable.
-     *
-     * Hace falta porque las dos fuentes traen cosas distintas: los flyers de las
-     * carpetas son png y jpg de hasta 2,7 MB, y todo se guarda con nombre .jpg y
-     * se sirve como image/jpeg. Sin normalizar, un png quedaría mintiendo sobre
-     * su propio tipo.
-     *
-     * Si GD no puede con la imagen se devuelve tal cual: una carátula rara es
-     * mejor que ninguna, y el navegador suele arreglárselas.
-     */
-    private function normalizar(string $bytes): ?string
-    {
-        try {
-            $imagen = @imagecreatefromstring($bytes);
-
-            if ($imagen === false) {
-                return strlen($bytes) > 1024 ? $bytes : null;
-            }
-
-            $ancho = imagesx($imagen);
-            $alto = imagesy($imagen);
-            $lado = max($ancho, $alto);
-
-            if ($lado > self::LADO_MAXIMO) {
-                $escala = self::LADO_MAXIMO / $lado;
-                $achicada = imagescale($imagen, (int) round($ancho * $escala), (int) round($alto * $escala));
-
-                if ($achicada !== false) {
-                    imagedestroy($imagen);
-                    $imagen = $achicada;
-                }
-            }
-
-            ob_start();
-            imagejpeg($imagen, null, 82);
-            $jpg = (string) ob_get_clean();
-            imagedestroy($imagen);
-
-            return strlen($jpg) > 1024 ? $jpg : null;
-        } catch (Throwable) {
-            return strlen($bytes) > 1024 ? $bytes : null;
         }
     }
 }
