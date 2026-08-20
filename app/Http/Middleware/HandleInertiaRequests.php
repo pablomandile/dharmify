@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Fuente;
+use App\Models\Lista;
 use App\Models\Serie;
 use Closure;
 use Illuminate\Http\Request;
@@ -102,7 +103,35 @@ class HandleInertiaRequests extends Middleware
              * worker ya guarda. Son 145 títulos: unos pocos KB.
              */
             'carpetas' => $this->carpetas($request),
+
+            /*
+             * Las listas de la persona. Compartidas por lo mismo: el menú de
+             * "agregar a una lista" cuelga de cada enseñanza, y las enseñanzas
+             * están en cuatro pantallas distintas.
+             */
+            'listas' => $this->listas($request),
         ];
+    }
+
+    /**
+     * @return array<int, array{id: int, nombre: string, pistas: int}>
+     */
+    private function listas(Request $request): array
+    {
+        if (! $request->user()) {
+            return [];
+        }
+
+        return $request->user()
+            ->listas()
+            ->withCount('pistas')
+            ->get()
+            ->map(fn (Lista $l) => [
+                'id' => $l->id,
+                'nombre' => $l->nombre,
+                'pistas' => $l->pistas_count,
+            ])
+            ->all();
     }
 
     /**

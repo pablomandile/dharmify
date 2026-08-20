@@ -8,6 +8,8 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\Contracts\PasskeyUser;
@@ -59,6 +61,24 @@ class User extends Authenticatable implements PasskeyUser
      * El administrador importa la biblioteca, edita la taxonomía e invita gente.
      * El invitado escucha y arma sus propias listas, nada más.
      */
+    /**
+     * Las enseñanzas marcadas como favoritas.
+     *
+     * @return BelongsToMany<Pista, $this>
+     */
+    public function favoritos(): BelongsToMany
+    {
+        return $this->belongsToMany(Pista::class, 'favoritos')
+            ->withPivot('created_at')
+            ->orderByPivotDesc('created_at');
+    }
+
+    /** @return HasMany<Lista, $this> */
+    public function listas(): HasMany
+    {
+        return $this->hasMany(Lista::class)->orderBy('nombre');
+    }
+
     public function esAdmin(): bool
     {
         return $this->rol === self::ROL_ADMIN;

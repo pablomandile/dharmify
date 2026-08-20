@@ -58,6 +58,56 @@ class Pista extends Model
     }
 
     /**
+     * Dónde vive el archivo cuando está en el server.
+     *
+     * Fuera del docroot a propósito: la biblioteca es privada y no puede quedar
+     * colgando de una URL adivinable. El nombre es la clave y no el original
+     * porque en la biblioteca hay 157 nombres de archivo repetidos.
+     */
+    public function rutaEnElServer(): string
+    {
+        return storage_path('app/private/audio/'.$this->clave.'.mp3');
+    }
+
+    /**
+     * Se pregunta al disco, no a la columna `en_server`.
+     *
+     * La purga borra archivos sin pasar por el modelo, así que la columna puede
+     * estar desactualizada y la pastilla de la pantalla mentiría.
+     */
+    public function estaEnElServer(): bool
+    {
+        return is_file($this->rutaEnElServer());
+    }
+
+    /**
+     * La ficha que consumen todas las pantallas que muestran pistas.
+     *
+     * Vive acá y no en cada controlador porque son cuatro —la serie, los
+     * favoritos, las listas y las descargas— y cuando se agregó la duración
+     * hubo que tocar los cuatro. Con una sola forma, agregar un campo es un
+     * lugar.
+     *
+     * @return array<string, mixed>
+     */
+    public function ficha(bool $favorita = false): array
+    {
+        return [
+            'id' => $this->id,
+            'titulo' => $this->titulo,
+            'serie' => $this->serie->titulo,
+            'serieId' => $this->serie->id,
+            'portada' => $this->serie->urlPortada(),
+            'duracion_seg' => $this->duracion_seg,
+            'bytes' => $this->bytes,
+            'grabada_el' => $this->grabada_el?->format('d/m/Y'),
+            'en_server' => $this->estaEnElServer(),
+            'en_nube' => $this->en_nube,
+            'favorita' => $favorita,
+        ];
+    }
+
+    /**
      * La clave estable.
      *
      * Sale del hash de la ruta completa dentro de la fuente. Medido sobre la

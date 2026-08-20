@@ -32,7 +32,7 @@ class PistaController extends Controller
     {
         $this->autorizar($pista);
 
-        $archivo = $this->rutaLocal($pista);
+        $archivo = $pista->rutaEnElServer();
 
         if (! is_file($archivo)) {
             /*
@@ -70,7 +70,7 @@ class PistaController extends Controller
     {
         $this->autorizar($pista);
 
-        if (is_file($this->rutaLocal($pista))) {
+        if (is_file($pista->rutaEnElServer())) {
             return response()->json(['estado' => 'listo']);
         }
 
@@ -86,7 +86,7 @@ class PistaController extends Controller
             $traido = $escanear->lectorPara($fuente)->traer(
                 $fuente->ruta,
                 $pista->ruta,
-                $this->rutaLocal($pista),
+                $pista->rutaEnElServer(),
             );
         } catch (Throwable $e) {
             return response()->json(['estado' => 'error', 'mensaje' => $e->getMessage()], 500);
@@ -126,15 +126,7 @@ class PistaController extends Controller
             ->whereIn('id', $ids)
             ->get()
             ->filter(fn (Pista $p) => $visibles->contains($p->serie->fuente_id))
-            ->map(fn (Pista $p) => [
-                'id' => $p->id,
-                'titulo' => $p->titulo,
-                'serie' => $p->serie->titulo,
-                'serieId' => $p->serie->id,
-                'portada' => $p->serie->urlPortada(),
-                'duracion_seg' => $p->duracion_seg,
-                'bytes' => $p->bytes,
-            ])
+            ->map(fn (Pista $p) => $p->ficha())
             ->values();
 
         return response()->json(['pistas' => $pistas]);
@@ -146,7 +138,7 @@ class PistaController extends Controller
         $this->autorizar($pista);
 
         return response()->json([
-            'en_server' => is_file($this->rutaLocal($pista)),
+            'en_server' => is_file($pista->rutaEnElServer()),
             'en_nube' => $pista->en_nube,
         ]);
     }
@@ -187,7 +179,7 @@ class PistaController extends Controller
     {
         $this->autorizar($pista);
 
-        $archivo = $this->rutaLocal($pista);
+        $archivo = $pista->rutaEnElServer();
 
         if (! is_file($archivo)) {
             return response()->json(['estado' => 'en_nube'], 202);
@@ -356,11 +348,6 @@ class PistaController extends Controller
     }
 
     /** Flat y por clave estable: en la biblioteca hay 157 nombres repetidos. */
-    private function rutaLocal(Pista $pista): string
-    {
-        return storage_path('app/private/audio/'.$pista->clave.'.mp3');
-    }
-
     private function autorizar(Pista $pista): void
     {
         abort_unless($this->fuentesVisibles()->contains($pista->serie->fuente_id), 404);

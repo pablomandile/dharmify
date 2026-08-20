@@ -11,6 +11,6 @@ export type NavItem = {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon;
     isActive?: boolean;
-    /** Si además de llevar a algún lado abre la lista de carpetas. */
-    desplegable?: boolean;
+    /** Qué cuelga de la opción cuando además de llevar a algún lado se despliega. */
+    desplegable?: 'carpetas' | 'listas';
 };

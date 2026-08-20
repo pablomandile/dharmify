@@ -94,13 +94,20 @@ class BibliotecaController extends Controller
         ]);
     }
 
-    public function serie(Serie $serie): Response
+    public function serie(Request $request, Serie $serie): Response
     {
         // Que exista no alcanza: tiene que venir de una fuente que esta persona
         // puede ver.
         abort_unless($this->fuentesVisibles()->contains($serie->fuente_id), 404);
 
         $serie->load('maestros:id,nombre,slug', 'fuente:id,nombre');
+
+        // De una sola consulta: preguntar pista por pista serían treinta
+        // consultas en un retiro largo.
+        $favoritas = $request->user()
+            ?->favoritos()
+            ->whereIn('pistas.id', $serie->pistas()->pluck('id'))
+            ->pluck('pistas.id') ?? collect();
 
         return Inertia::render('serie/Show', [
             'serie' => [
@@ -117,20 +124,7 @@ class BibliotecaController extends Controller
             'pistas' => $serie->pistas()
                 ->orderBy('orden')
                 ->get()
-                ->map(fn (Pista $p) => [
-                    'id' => $p->id,
-                    'titulo' => $p->titulo,
-                    'duracion_seg' => $p->duracion_seg,
-                    'bytes' => $p->bytes,
-                    'grabada_el' => $p->grabada_el?->format('d/m/Y'),
-                    /*
-                     * El estado real del disco, no la columna: la purga borra
-                     * archivos sin pasar por el modelo, así que `en_server`
-                     * puede estar desactualizada y la pastilla mentiría.
-                     */
-                    'en_server' => is_file(storage_path('app/private/audio/'.$p->clave.'.mp3')),
-                    'en_nube' => $p->en_nube,
-                ]),
+                ->map(fn (Pista $p) => $p->ficha($favoritas->contains($p->id))),
         ]);
     }
 

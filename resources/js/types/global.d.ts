@@ -21,6 +21,8 @@ declare module '@inertiajs/core' {
             sidebarOpen: boolean;
             /** Las carpetas del desplegable del menú. */
             carpetas: { id: number; titulo: string; anio: number | null }[];
+            /** Las listas de la persona, para el menú de "agregar a". */
+            listas: { id: number; nombre: string; pistas: number }[];
             [key: string]: unknown;
         };
     }

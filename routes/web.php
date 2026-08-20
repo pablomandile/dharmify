@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\Auth\GoogleController;
 use App\Http\Controllers\BibliotecaController;
+use App\Http\Controllers\FavoritoController;
 use App\Http\Controllers\InicioController;
+use App\Http\Controllers\ListaController;
 use App\Http\Controllers\PistaController;
 use Illuminate\Support\Facades\Route;
 
@@ -82,6 +84,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
      * teléfono no está en la computadora y el servidor no tiene forma de saberlo.
      */
     Route::inertia('descargas', 'Descargas')->name('descargas');
+
+    /*
+     * Favoritos y listas son de cada persona, no del catálogo: por eso no piden
+     * ser administrador, y por eso cada consulta arranca desde el usuario.
+     */
+    Route::get('favoritos', [FavoritoController::class, 'index'])->name('favoritos');
+    Route::post('favoritos/{pista}', [FavoritoController::class, 'alternar'])->name('favoritos.alternar');
+
+    Route::get('listas', [ListaController::class, 'index'])->name('listas');
+    Route::post('listas', [ListaController::class, 'store'])->name('listas.store');
+    Route::get('listas/{lista}', [ListaController::class, 'show'])->name('listas.show');
+    Route::patch('listas/{lista}', [ListaController::class, 'update'])->name('listas.update');
+    Route::delete('listas/{lista}', [ListaController::class, 'destroy'])->name('listas.destroy');
+    Route::post('listas/{lista}/pistas', [ListaController::class, 'agregar'])->name('listas.agregar');
+    Route::delete('listas/{lista}/pistas/{pista}', [ListaController::class, 'quitar'])->name('listas.quitar');
+    Route::patch('listas/{lista}/pistas/{pista}', [ListaController::class, 'mover'])->name('listas.mover');
 });
 
 require __DIR__.'/settings.php';

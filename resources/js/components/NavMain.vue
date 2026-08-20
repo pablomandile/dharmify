@@ -21,6 +21,10 @@ import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import type { NavItem } from '@/types';
 
 type Carpeta = { id: number; titulo: string; anio: number | null };
+type Lista = { id: number; nombre: string; pistas: number };
+
+/** Lo que cuelga de cada opción desplegable del menú. */
+type Sub = { id: number; texto: string; href: string; al_costado?: string };
 
 defineProps<{
     items: NavItem[];
@@ -35,9 +39,32 @@ const page = usePage();
  * así el desplegable también se abre sin conexión, porque viaja dentro del HTML
  * que el service worker ya tiene guardado.
  */
-const carpetas = computed(() => (page.props.carpetas ?? []) as Carpeta[]);
+const carpetas = computed(() =>
+    ((page.props.carpetas ?? []) as Carpeta[]).map((c): Sub => ({
+        id: c.id,
+        texto: c.titulo,
+        href: `/series/${c.id}`,
+        al_costado: c.anio ? String(c.anio) : undefined,
+    })),
+);
 
-const abierto = ref(false);
+const listas = computed(() =>
+    ((page.props.listas ?? []) as Lista[]).map((l): Sub => ({
+        id: l.id,
+        texto: l.nombre,
+        href: `/listas/${l.id}`,
+        al_costado: String(l.pistas),
+    })),
+);
+
+const sub = (item: NavItem): Sub[] =>
+    item.desplegable === 'carpetas' ? carpetas.value : listas.value;
+
+/*
+ * Un abierto por opción y no uno solo: si "Dharma" y "Mis listas" compartieran
+ * el estado, abrir una cerraría la otra sin que nadie lo haya pedido.
+ */
+const abiertos = ref<Record<string, boolean>>({});
 </script>
 
 <template>
@@ -52,9 +79,10 @@ const abierto = ref(false);
                     una carpeta serían siempre dos pantallas.
                 -->
                 <Collapsible
-                    v-if="item.desplegable && carpetas.length"
-                    v-model:open="abierto"
+                    v-if="item.desplegable && sub(item).length"
+                    :open="abiertos[item.title] === true"
                     class="group/collapsible"
+                    @update:open="(v: boolean) => (abiertos[item.title] = v)"
                 >
                     <div class="flex items-center">
                         <SidebarMenuButton
@@ -71,15 +99,11 @@ const abierto = ref(false);
 
                         <CollapsibleTrigger
                             class="mr-1 grid size-7 shrink-0 place-items-center rounded-md text-sidebar-foreground/70 transition-colors group-data-[collapsible=icon]:hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                            :aria-label="
-                                abierto
-                                    ? 'Ocultar las carpetas'
-                                    : 'Ver las carpetas'
-                            "
+                            :aria-label="`Ver ${item.title}`"
                         >
                             <ChevronRight
                                 class="size-4 transition-transform duration-200"
-                                :class="abierto && 'rotate-90'"
+                                :class="abiertos[item.title] && 'rotate-90'"
                             />
                         </CollapsibleTrigger>
                     </div>
@@ -94,24 +118,22 @@ const abierto = ref(false);
                             class="max-h-[50vh] overflow-y-auto pr-1"
                         >
                             <SidebarMenuSubItem
-                                v-for="carpeta in carpetas"
-                                :key="carpeta.id"
+                                v-for="fila in sub(item)"
+                                :key="fila.id"
                             >
                                 <SidebarMenuSubButton
                                     as-child
-                                    :is-active="
-                                        isCurrentUrl(`/series/${carpeta.id}`)
-                                    "
+                                    :is-active="isCurrentUrl(fila.href)"
                                 >
-                                    <Link :href="`/series/${carpeta.id}`">
+                                    <Link :href="fila.href">
                                         <span class="truncate">
-                                            {{ carpeta.titulo }}
+                                            {{ fila.texto }}
                                         </span>
                                         <span
-                                            v-if="carpeta.anio"
+                                            v-if="fila.al_costado"
                                             class="ml-auto shrink-0 text-xs text-sidebar-foreground/50"
                                         >
-                                            {{ carpeta.anio }}
+                                            {{ fila.al_costado }}
                                         </span>
                                     </Link>
                                 </SidebarMenuSubButton>
