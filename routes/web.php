@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\GoogleController;
 use App\Http\Controllers\BibliotecaController;
 use App\Http\Controllers\InicioController;
+use App\Http\Controllers\PistaController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -43,6 +44,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('biblioteca', [BibliotecaController::class, 'index'])->name('biblioteca');
 
     Route::get('series/{serie}', [BibliotecaController::class, 'serie'])->name('series.show');
+    Route::get('series/{serie}/portada', [PistaController::class, 'portada'])->name('series.portada');
+
+    /*
+     * El audio. Va fuera del docroot y pasa por acá, que valida la sesión antes
+     * de mandar un solo byte.
+     */
+    Route::get('pistas/{pista}/audio', [PistaController::class, 'audio'])->name('pistas.audio');
+    Route::get('pistas/{pista}/bajar', [PistaController::class, 'descargar'])->name('pistas.bajar');
+    Route::post('pistas/{pista}/restaurar', [PistaController::class, 'restaurar'])->name('pistas.restaurar');
+
+    /*
+     * El estado va bajo /api porque el service worker tiene prohibido cachear
+     * esa rama: una copia vieja diciendo "en la nube" cuando el archivo ya está
+     * es peor que un error de red.
+     */
+    Route::get('api/pistas/{pista}/estado', [PistaController::class, 'estado'])->name('pistas.estado');
 });
 
 require __DIR__.'/settings.php';

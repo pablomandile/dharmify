@@ -38,23 +38,24 @@ class ExtraerPortada
 
         $fuente = $serie->fuente;
         $cabecera = $this->escanear->lectorPara($fuente)->cabecera($fuente->ruta, $pista->ruta);
+        $imagen = $cabecera ? $this->imagenDe($cabecera) : null;
 
-        if (! $cabecera) {
-            return false;
+        $cambios = ['portada_revisada_en' => now()];
+
+        if ($imagen) {
+            $ruta = self::CARPETA.'/serie-'.$serie->id.'.jpg';
+            Storage::disk(self::DISCO)->put($ruta, $imagen);
+            $cambios['portada'] = $ruta;
         }
 
-        $imagen = $this->imagenDe($cabecera);
+        /*
+         * La marca de revisión se guarda SIEMPRE, haya imagen o no. Sin eso, una
+         * serie cuyo audio no trae carátula vuelve a la cola en cada tanda y el
+         * trabajo nunca avanza más allá de las primeras.
+         */
+        $serie->forceFill($cambios)->save();
 
-        if (! $imagen) {
-            return false;
-        }
-
-        $ruta = self::CARPETA.'/serie-'.$serie->id.'.jpg';
-        Storage::disk(self::DISCO)->put($ruta, $imagen);
-
-        $serie->forceFill(['portada' => $ruta])->save();
-
-        return true;
+        return (bool) $imagen;
     }
 
     /**

@@ -26,7 +26,7 @@ class ExtraerPortadas extends Command
     {
         $series = Serie::query()
             ->with('fuente')
-            ->when(! $this->option('todas'), fn ($q) => $q->whereNull('portada'))
+            ->when(! $this->option('todas'), fn ($q) => $q->whereNull('portada_revisada_en'))
             ->has('pistas')
             ->orderBy('id')
             ->limit((int) $this->option('limite'))
@@ -56,7 +56,7 @@ class ExtraerPortadas extends Command
             }
         }
 
-        $faltan = Serie::whereNull('portada')->has('pistas')->count();
+        $faltan = Serie::whereNull('portada_revisada_en')->has('pistas')->count();
 
         $this->newLine();
         $this->info("Carátulas nuevas: {$con} · sin imagen: {$sin} · quedan por revisar: {$faltan}");

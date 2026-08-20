@@ -82,6 +82,28 @@ class LectorRclone implements LectorDeFuente
         return $proceso->isSuccessful() ? $proceso->getOutput() : null;
     }
 
+    public function traer(string $raiz, string $ruta, string $destino): bool
+    {
+        @mkdir(dirname($destino), 0775, true);
+
+        /*
+         * `copyto` y no `copy`: copy deja el archivo con su nombre original
+         * dentro de la carpeta destino, y acá el nombre lo decidimos nosotros
+         * (la clave estable), porque en la biblioteca hay 157 nombres repetidos.
+         *
+         * `--no-traverse` evita que rclone liste la carpeta entera para copiar
+         * un solo archivo: con bibliotecas grandes es la diferencia entre
+         * segundos y minutos.
+         */
+        $proceso = new Process(
+            [$this->binario(), 'copyto', rtrim($raiz, '/').'/'.$ruta, $destino, '--no-traverse'],
+            timeout: 1800,
+        );
+        $proceso->run();
+
+        return $proceso->isSuccessful() && is_file($destino);
+    }
+
     /**
      * Primero el binario del proyecto y después el del PATH: así el mismo código
      * anda en Windows y en el hosting, donde rclone es un archivo suelto que se

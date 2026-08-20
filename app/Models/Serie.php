@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 #[Fillable([
     'fuente_id', 'carpeta', 'carpeta_hash', 'titulo', 'slug',
-    'tipo', 'anio', 'idioma', 'portada', 'editada_a_mano',
+    'tipo', 'anio', 'idioma', 'portada', 'portada_revisada_en', 'editada_a_mano',
 ])]
 class Serie extends Model
 {
@@ -35,6 +35,7 @@ class Serie extends Model
         return [
             'anio' => 'integer',
             'editada_a_mano' => 'boolean',
+            'portada_revisada_en' => 'datetime',
         ];
     }
 

@@ -47,10 +47,25 @@ class LectorLocal implements LectorDeFuente
             return null;
         }
 
-        $datos = fread($fh, $bytes);
+        $datos = fread($fh, max(1, $bytes));
         fclose($fh);
 
         return $datos !== false ? $datos : null;
+    }
+
+    public function traer(string $raiz, string $ruta, string $destino): bool
+    {
+        $origen = rtrim(str_replace('\\', '/', $raiz), '/').'/'.$ruta;
+
+        if (! is_file($origen)) {
+            return false;
+        }
+
+        @mkdir(dirname($destino), 0775, true);
+
+        // copy() sobre un marcador de OneDrive lo hidrata primero: es lento la
+        // primera vez, pero es exactamente lo que se está pidiendo.
+        return copy($origen, $destino);
     }
 
     public function listar(string $raiz): iterable

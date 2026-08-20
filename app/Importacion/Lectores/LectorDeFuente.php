@@ -26,6 +26,13 @@ interface LectorDeFuente
      */
     public function cabecera(string $raiz, string $ruta, int $bytes = 400000): ?string;
 
+    /**
+     * Trae un archivo completo al server.
+     *
+     * Es lo que pasa cuando alguien le da play a algo que está sólo en la nube.
+     */
+    public function traer(string $raiz, string $ruta, string $destino): bool;
+
     /** Para avisar con claridad cuando la fuente no existe o no se puede leer. */
     public function verificar(string $raiz): ?string;
 }
