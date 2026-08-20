@@ -71,9 +71,9 @@
              que si no se quedan con el ícono viejo para siempre. Al cambiar un
              ícono hay que subir este número Y el de sw.js Y el del manifest. --}}
         <link rel="manifest" href="/manifest.webmanifest">
-        <link rel="icon" href="/favicon.ico?v=4" sizes="any">
-        <link rel="icon" href="/icons/icon-192.png?v=4" type="image/png">
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=4">
+        <link rel="icon" href="/favicon.ico?v=5" sizes="any">
+        <link rel="icon" href="/icons/icon-192.png?v=5" type="image/png">
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=5">
 
         @fonts
 

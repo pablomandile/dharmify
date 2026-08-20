@@ -35,17 +35,30 @@ class GenerarIconos extends Command
      */
     private const UMBRAL = 110;
 
-    /** Aire alrededor de la marca, en proporción a su lado. */
-    private const AIRE = 0.12;
+    /**
+     * Aire alrededor de la marca, en proporción al lado del ícono.
+     *
+     * Poco a propósito: el recorte ya trae su propio margen negro —la marca es
+     * más ancha que alta y el cuadrado la deja con aire arriba y abajo— así que
+     * todo lo que se sume acá se suma a ese.
+     */
+    private const AIRE = 0.04;
 
     /**
-     * El recorte extra del ícono maskable.
+     * El aire del ícono maskable, que sale de una cuenta y no de tantear.
      *
      * Android le pasa una máscara por encima —círculo, cuadrado redondeado, gota
-     * según el teléfono— y se queda con el 80% del centro. Sin este aire, en un
-     * lanzador circular la flor aparecería con los pétalos cortados.
+     * según el teléfono— y garantiza sólo el círculo central del 80%, o sea un
+     * radio de 0,4 del lado. Lo que más lejos llega del centro son las puntas de
+     * los auriculares, sobre la horizontal, a media anchura de la marca. Con un
+     * aire `p`, esa media anchura vale 0,5·(1−2p) del ícono, y entra en el
+     * círculo si 0,5·(1−2p) ≤ 0,4, o sea p ≥ 0,10.
+     *
+     * O sea: 0,10 es el máximo tamaño posible sin que la máscara corte nada.
+     * Estaba en 0,30, que dejaba la marca en el 40% del ancho —de ahí el borde
+     * negro que se comía el logo en el lanzador—.
      */
-    private const AIRE_MASCARA = 0.30;
+    private const AIRE_MASCARA = 0.10;
 
     public function handle(): int
     {
