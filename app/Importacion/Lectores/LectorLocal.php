@@ -28,6 +28,31 @@ class LectorLocal implements LectorDeFuente
         return null;
     }
 
+    /**
+     * OJO: sobre una carpeta de OneDrive sincronizada, leer aunque sea el primer
+     * byte HIDRATA el archivo entero. Para sacar carátulas conviene correr esto
+     * contra una fuente rclone, que sí trae sólo el encabezado.
+     */
+    public function cabecera(string $raiz, string $ruta, int $bytes = 400000): ?string
+    {
+        $completa = rtrim(str_replace('\\', '/', $raiz), '/').'/'.$ruta;
+
+        if (! is_file($completa)) {
+            return null;
+        }
+
+        $fh = @fopen($completa, 'rb');
+
+        if (! $fh) {
+            return null;
+        }
+
+        $datos = fread($fh, $bytes);
+        fclose($fh);
+
+        return $datos !== false ? $datos : null;
+    }
+
     public function listar(string $raiz): iterable
     {
         $raiz = rtrim(str_replace('\\', '/', $raiz), '/');

@@ -18,6 +18,14 @@ interface LectorDeFuente
      */
     public function listar(string $raiz): iterable;
 
+    /**
+     * Los primeros bytes de un archivo, sin traerlo entero.
+     *
+     * Es lo que permite sacar la carátula y los tags: viven en el encabezado.
+     * Bajar los archivos completos para leerlos serían decenas de gigas.
+     */
+    public function cabecera(string $raiz, string $ruta, int $bytes = 400000): ?string;
+
     /** Para avisar con claridad cuando la fuente no existe o no se puede leer. */
     public function verificar(string $raiz): ?string;
 }

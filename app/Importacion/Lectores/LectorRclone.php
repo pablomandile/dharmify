@@ -69,6 +69,19 @@ class LectorRclone implements LectorDeFuente
         }
     }
 
+    public function cabecera(string $raiz, string $ruta, int $bytes = 400000): ?string
+    {
+        // `cat --head` trae sólo los primeros bytes: 400 KB alcanzan para los
+        // tags y la carátula. Bajar el archivo entero serían ~25 MB por pista.
+        $proceso = new Process(
+            [$this->binario(), 'cat', '--head', (string) $bytes, rtrim($raiz, '/').'/'.$ruta],
+            timeout: 120,
+        );
+        $proceso->run();
+
+        return $proceso->isSuccessful() ? $proceso->getOutput() : null;
+    }
+
     /**
      * Primero el binario del proyecto y después el del PATH: así el mismo código
      * anda en Windows y en el hosting, donde rclone es un archivo suelto que se
