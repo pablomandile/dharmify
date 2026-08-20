@@ -86,6 +86,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('descargas', 'Descargas')->name('descargas');
 
     /*
+     * Va dentro del grupo con sesión, como todo lo demás.
+     *
+     * En movieboxd la misma pantalla es pública porque ahí hay algo que mostrarle
+     * a quien llega de afuera. Dharmify no: la raíz manda al login y no existe
+     * ninguna pantalla anónima, así que abrirle una excepción a ésta significaría
+     * dibujarle la barra lateral entera —con su menú de cuenta— a alguien que no
+     * tiene cuenta.
+     */
+    Route::inertia('acerca-de', 'AcercaDe')->name('acerca-de');
+
+    /*
      * Favoritos y listas son de cada persona, no del catálogo: por eso no piden
      * ser administrador, y por eso cada consulta arranca desde el usuario.
      */

@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { Link, router } from '@inertiajs/vue3';
-import { HardDriveDownload, Heart, LayoutGrid, ListMusic } from '@lucide/vue';
+import {
+    HardDriveDownload,
+    Heart,
+    Info,
+    LayoutGrid,
+    ListMusic,
+} from '@lucide/vue';
 import { onUnmounted } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import BotonInstalar from '@/components/BotonInstalar.vue';
@@ -16,6 +22,7 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from '@/components/ui/sidebar';
+import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { biblioteca } from '@/routes';
 import type { NavItem } from '@/types';
 
@@ -49,6 +56,8 @@ const mainNavItems: NavItem[] = [
  * kit y a la doc de Laravel. Son andamiaje: en una biblioteca de enseñanzas no
  * significan nada para quien la usa.
  */
+
+const { isCurrentUrl } = useCurrentUrl();
 
 const { isMobile, setOpenMobile } = useSidebar();
 
@@ -92,6 +101,28 @@ onUnmounted(
         </SidebarContent>
 
         <SidebarFooter>
+            <!--
+                "Acerca de" va acá abajo y no en el menú principal: se entra una
+                vez en la vida, y arriba le sacaría lugar a lo que se usa todos
+                los días.
+            -->
+            <SidebarMenu>
+                <SidebarMenuItem>
+                    <SidebarMenuButton
+                        as-child
+                        size="sm"
+                        :is-active="isCurrentUrl('/acerca-de')"
+                        tooltip="Acerca de"
+                        class="text-sidebar-foreground/70"
+                    >
+                        <Link href="/acerca-de">
+                            <Info />
+                            <span>Acerca de</span>
+                        </Link>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+            </SidebarMenu>
+
             <BotonInstalar />
             <NavUser />
         </SidebarFooter>
