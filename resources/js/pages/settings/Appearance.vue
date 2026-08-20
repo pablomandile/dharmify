@@ -8,7 +8,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Appearance settings',
+                title: 'Apariencia',
                 href: edit(),
             },
         ],
@@ -17,14 +17,14 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Appearance settings" />
+    <Head title="Apariencia" />
 
     <h1 class="sr-only">Configuración de apariencia</h1>
 
     <div class="space-y-6">
         <Heading
             variant="small"
-            title="Appearance settings"
+            title="Apariencia"
             description="Elegí cómo se ve la app"
         />
         <AppearanceTabs />

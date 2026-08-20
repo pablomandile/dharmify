@@ -40,14 +40,14 @@ onUnmounted(() => clearTwoFactorAuthData());
             class="flex flex-col items-start justify-start space-y-4"
         >
             <p class="text-sm text-muted-foreground">
-                When you enable two-factor authentication, you will be prompted
-                for a secure pin during login. This pin can be retrieved from a
-                TOTP-supported application on your phone.
+                Con la verificación en dos pasos, al entrar te vamos a pedir un
+                código además de la contraseña. Ese código lo genera una app de
+                autenticación en tu teléfono.
             </p>
 
             <div>
                 <Button v-if="hasSetupData" @click="showSetupModal = true">
-                    <ShieldCheck />Continue setup
+                    <ShieldCheck />Continuar la configuración
                 </Button>
                 <Form
                     v-else
@@ -56,7 +56,7 @@ onUnmounted(() => clearTwoFactorAuthData());
                     #default="{ processing }"
                 >
                     <Button type="submit" :disabled="processing">
-                        Enable 2FA
+                        Activar
                     </Button>
                 </Form>
             </div>
@@ -64,9 +64,8 @@ onUnmounted(() => clearTwoFactorAuthData());
 
         <div v-else class="flex flex-col items-start justify-start space-y-4">
             <p class="text-sm text-muted-foreground">
-                You will be prompted for a secure, random pin during login,
-                which you can retrieve from the TOTP-supported application on
-                your phone.
+                Al entrar te vamos a pedir un código, que vas a encontrar en la
+                app de autenticación de tu teléfono.
             </p>
 
             <div class="relative inline">
@@ -76,7 +75,7 @@ onUnmounted(() => clearTwoFactorAuthData());
                         type="submit"
                         :disabled="processing"
                     >
-                        Disable 2FA
+                        Desactivar
                     </Button>
                 </Form>
             </div>
