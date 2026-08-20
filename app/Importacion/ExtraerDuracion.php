@@ -28,15 +28,22 @@ use Throwable;
 class ExtraerDuracion
 {
     /**
-     * 400 KB, igual que las carátulas, y por el mismo motivo.
+     * Cuánto encabezado se pide de entrada.
      *
-     * Medido: un archivo con una imagen embebida grande tiene la etiqueta ID3
-     * ocupando 188 KB, y hasta 200 KB de encabezado getID3 todavía contestaba
-     * null. Recién con 400 KB apareció la duración. Leer menos no ahorra tiempo
-     * —contra OneDrive, 32 KB tardan 7,5 s y 400 KB, 9 s: el costo es la ida y
-     * vuelta, no los bytes— así que no hay nada que ganar recortando.
+     * Medido contra la nube: el tamaño del pedido casi no cambia lo que tarda,
+     * porque el costo es la ida y vuelta. Sobre el mismo archivo, 400 KB
+     * tardaron 8,1 s; 1 MB, 9,2 s; 1,5 MB, 9,5 s; 2,5 MB, 7,8 s. Siendo así,
+     * pedir de más sale gratis y pedir de menos se paga carísimo: con 400 KB una
+     * serie entera quedó sin duración porque su carátula embebida ocupa 748 KB
+     * y el audio recién empieza en el byte 758.794.
      */
-    private const CABECERA = 400000;
+    private const CABECERA = 1500000;
+
+    /**
+     * Tope del segundo intento. Una etiqueta que dice medir más que esto está
+     * rota, y bajar el archivo entero por una duración no vale la pena.
+     */
+    private const CABECERA_MAXIMA = 8000000;
 
     /** Más de un día de grabación es un dato roto, no una enseñanza larga. */
     private const TOPE_SEGUNDOS = 86400;
@@ -55,9 +62,7 @@ class ExtraerDuracion
      */
     public function deLote(Collection $pistas, int $paralelo = 3): array
     {
-        $con = 0;
-        $sin = 0;
-        $ilegibles = 0;
+        $cuenta = ['con' => 0, 'sin' => 0, 'ilegibles' => 0];
 
         $porFuente = $pistas->groupBy(fn (Pista $p) => $p->serie->fuente_id);
         $fuentes = Fuente::findMany($porFuente->keys()->all())->keyBy('id');
@@ -71,78 +76,132 @@ class ExtraerDuracion
                 continue;
             }
 
-            // Dos pistas pueden compartir ruta si alguien apuntó dos fuentes a
-            // carpetas que se solapan; el índice las junta a todas.
-            /** @var array<string, list<Pista>> $porRuta */
-            $porRuta = [];
+            $this->deUnaFuente($fuente, $delaFuente, $paralelo, $cuenta);
+        }
 
-            foreach ($delaFuente as $pista) {
-                $porRuta[$pista->ruta][] = $pista;
-            }
+        return $cuenta;
+    }
 
-            $lector = $this->escanear->lectorPara($fuente);
+    /**
+     * @param  Collection<int, Pista>  $pistas
+     * @param  array{con: int, sin: int, ilegibles: int}  $cuenta
+     */
+    private function deUnaFuente(Fuente $fuente, Collection $pistas, int $paralelo, array &$cuenta): void
+    {
+        $lector = $this->escanear->lectorPara($fuente);
 
-            /** @var list<string> $fallaron */
-            $fallaron = [];
+        // Dos pistas pueden compartir ruta si alguien apuntó dos fuentes a
+        // carpetas que se solapan; el índice las junta a todas.
+        /** @var array<string, list<Pista>> $porRuta */
+        $porRuta = [];
 
+        foreach ($pistas as $pista) {
+            $porRuta[$pista->ruta][] = $pista;
+        }
+
+        /** @var list<string> $sinRespuesta */
+        $sinRespuesta = [];
+
+        /** @var array<string, int> $agrandar */
+        $agrandar = [];
+
+        $lector->cabeceras(
+            $fuente->ruta,
+            array_keys($porRuta),
+            function (string $ruta, ?string $cabecera) use ($porRuta, &$cuenta, &$sinRespuesta, &$agrandar) {
+                if ($cabecera === null) {
+                    $sinRespuesta[] = $ruta;
+
+                    return;
+                }
+
+                $falta = $this->cuantoHaceFalta($cabecera);
+
+                /*
+                 * Si la etiqueta declara ser más larga que lo que pedimos, no es
+                 * que la duración no se pueda calcular: es que el audio todavía
+                 * no empezó. Pedir de nuevo sale más barato que perder la pista.
+                 */
+                if ($falta !== null && ! $this->tieneDuracion($porRuta[$ruta] ?? [], $cabecera)) {
+                    $agrandar[$ruta] = $falta;
+
+                    return;
+                }
+
+                $this->guardar($porRuta[$ruta] ?? [], $cabecera, $cuenta);
+            },
+            self::CABECERA,
+            $paralelo,
+        );
+
+        /*
+         * Segundo intento de lo que no contestó, de a uno. Casi todo lo que
+         * falla es la nube que no respondió o el hosting que se quedó sin
+         * hilos: sin competencia, la misma lectura suele salir bien.
+         */
+        if ($sinRespuesta !== []) {
             $lector->cabeceras(
                 $fuente->ruta,
-                array_keys($porRuta),
-                function (string $ruta, ?string $cabecera) use ($porRuta, &$con, &$sin, &$fallaron) {
+                $sinRespuesta,
+                function (string $ruta, ?string $cabecera) use ($porRuta, &$cuenta) {
                     if ($cabecera === null) {
-                        $fallaron[] = $ruta;
+                        $cuenta['ilegibles'] += count($porRuta[$ruta] ?? []);
 
                         return;
                     }
 
-                    $this->guardar($porRuta[$ruta] ?? [], $cabecera, $con, $sin);
+                    $this->guardar($porRuta[$ruta] ?? [], $cabecera, $cuenta);
                 },
                 self::CABECERA,
-                $paralelo,
+                paralelo: 1,
             );
-
-            if ($fallaron !== []) {
-                /*
-                 * Segundo intento, de a uno. Casi todo lo que falla es la nube
-                 * que no contestó o el hosting que se quedó sin hilos: sin
-                 * competencia, la misma lectura suele salir bien.
-                 */
-                $lector->cabeceras(
-                    $fuente->ruta,
-                    $fallaron,
-                    function (string $ruta, ?string $cabecera) use ($porRuta, &$con, &$sin, &$ilegibles) {
-                        if ($cabecera === null) {
-                            $ilegibles += count($porRuta[$ruta] ?? []);
-
-                            return;
-                        }
-
-                        $this->guardar($porRuta[$ruta] ?? [], $cabecera, $con, $sin);
-                    },
-                    self::CABECERA,
-                    paralelo: 1,
-                );
-            }
         }
 
-        return ['con' => $con, 'sin' => $sin, 'ilegibles' => $ilegibles];
+        // Y las que necesitan más encabezado, pidiendo exactamente lo que su
+        // propia etiqueta dice medir.
+        foreach ($agrandar as $ruta => $falta) {
+            $cabecera = $lector->cabecera($fuente->ruta, $ruta, min($falta, self::CABECERA_MAXIMA));
+
+            if ($cabecera === null) {
+                $cuenta['ilegibles'] += count($porRuta[$ruta] ?? []);
+
+                continue;
+            }
+
+            $this->guardar($porRuta[$ruta] ?? [], $cabecera, $cuenta);
+        }
     }
 
     /**
      * @param  list<Pista>  $pistas
      */
-    private function guardar(array $pistas, string $cabecera, int &$con, int &$sin): void
+    private function tieneDuracion(array $pistas, string $cabecera): bool
+    {
+        foreach ($pistas as $pista) {
+            if ($this->segundosDe($cabecera, $pista->bytes) === null) {
+                return false;
+            }
+        }
+
+        return $pistas !== [];
+    }
+
+    /**
+     * @param  list<Pista>  $pistas
+     * @param  array{con: int, sin: int, ilegibles: int}  $cuenta
+     */
+    private function guardar(array $pistas, string $cabecera, array &$cuenta): void
     {
         foreach ($pistas as $pista) {
             $segundos = $this->segundosDe($cabecera, $pista->bytes);
 
             $cambios = ['duracion_revisada_en' => now()];
 
-            if ($segundos) {
+            if ($segundos !== null) {
                 $cambios['duracion_seg'] = $segundos;
-                $con++;
+                $cuenta['con']++;
             } else {
-                $sin++;
+                $cuenta['sin']++;
             }
 
             /*
@@ -163,6 +222,35 @@ class ExtraerDuracion
     }
 
     /**
+     * Cuánto encabezado haría falta, según lo que declara la etiqueta ID3v2.
+     *
+     * Devuelve null si con lo que ya tenemos alcanzaba —o si el archivo ni
+     * siquiera empieza con una etiqueta—, así no se gasta una segunda lectura
+     * en algo que no la necesita.
+     */
+    private function cuantoHaceFalta(string $cabecera): ?int
+    {
+        if (strlen($cabecera) < 10 || substr($cabecera, 0, 3) !== 'ID3') {
+            return null;
+        }
+
+        /*
+         * El largo son cuatro bytes "syncsafe": siete bits útiles cada uno, con
+         * el octavo siempre en cero para que la etiqueta nunca se parezca al
+         * comienzo de un cuadro de audio.
+         */
+        $bytes = array_map(ord(...), str_split(substr($cabecera, 6, 4)));
+
+        $largo = ($bytes[0] << 21) | ($bytes[1] << 14) | ($bytes[2] << 7) | $bytes[3];
+
+        // La etiqueta entera más unos cuantos cuadros de audio, que es lo que
+        // getID3 necesita ver para contar.
+        $necesario = 10 + $largo + 65536;
+
+        return $necesario > strlen($cabecera) ? $necesario : null;
+    }
+
+    /**
      * getID3 trabaja sobre un archivo, no sobre una cadena, así que el pedazo
      * de encabezado va a un temporal. Se borra siempre, incluso si el análisis
      * explota: sin eso, un barrido de 928 pistas deja 928 archivos sueltos.
@@ -179,7 +267,7 @@ class ExtraerDuracion
             file_put_contents($temporal, $cabecera);
 
             // El segundo argumento es todo: sin él getID3 cree que el archivo
-            // mide 400 KB y contesta la duración de ese pedacito.
+            // mide lo que le pasamos y contesta la duración de ese pedacito.
             $datos = (new getID3)->analyze($temporal, max($bytesReales, strlen($cabecera)));
 
             $segundos = $datos['playtime_seconds'] ?? null;

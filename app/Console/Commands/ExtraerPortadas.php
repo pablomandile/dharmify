@@ -18,7 +18,8 @@ class ExtraerPortadas extends Command
 {
     protected $signature = 'dharma:portadas
         {--limite=40 : Cuántas series procesar en esta tanda}
-        {--todas : Rehacer también las que ya tienen carátula}';
+        {--todas : Rehacer también las que ya tienen carátula}
+        {--sin-portada : Reintentar sólo las que se revisaron y quedaron sin imagen}';
 
     protected $description = 'Extrae la carátula de cada serie desde el primer audio, sin descargar los archivos';
 
@@ -26,9 +27,20 @@ class ExtraerPortadas extends Command
     {
         $series = Serie::query()
             ->with('fuente')
-            ->when(! $this->option('todas'), fn ($q) => $q->whereNull('portada_revisada_en'))
+            /*
+             * Tres modos: lo que falta revisar (lo normal), todo de nuevo, o
+             * sólo lo que se revisó y no dio imagen. El tercero existe porque el
+             * primer barrido pedía 400 KB de encabezado y las carátulas grandes
+             * no entraban: esas series quedaron marcadas y sin imagen, y hay que
+             * poder volver sobre ellas sin releer las 145.
+             */
+            ->when($this->option('sin-portada'), fn ($q) => $q->whereNull('portada')->whereNotNull('portada_revisada_en'))
+            ->when(
+                ! $this->option('todas') && ! $this->option('sin-portada'),
+                fn ($q) => $q->whereNull('portada_revisada_en'),
+            )
             ->has('pistas')
-            ->orderBy('id')
+            ->orderBy($this->option('sin-portada') ? 'portada_revisada_en' : 'id')
             ->limit((int) $this->option('limite'))
             ->get();
 

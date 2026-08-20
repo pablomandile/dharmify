@@ -23,6 +23,16 @@ class ExtraerPortada
 
     private const CARPETA = 'portadas';
 
+    /**
+     * Cuánto encabezado se pide.
+     *
+     * Empezó en 400 KB y se quedó corto: hay series cuya carátula embebida pesa
+     * 748 KB, así que el pedido las cortaba justo a la mitad y quedaban sin
+     * imagen. Pedir de más no cuesta: medido contra la nube, 400 KB tardan 8,1 s
+     * y 2,5 MB tardan 7,8 s, porque lo que se paga es la ida y vuelta.
+     */
+    private const CABECERA = 1500000;
+
     public function __construct(private readonly EscanearFuente $escanear) {}
 
     /**
@@ -37,7 +47,7 @@ class ExtraerPortada
         }
 
         $fuente = $serie->fuente;
-        $cabecera = $this->escanear->lectorPara($fuente)->cabecera($fuente->ruta, $pista->ruta);
+        $cabecera = $this->escanear->lectorPara($fuente)->cabecera($fuente->ruta, $pista->ruta, self::CABECERA);
         $imagen = $cabecera ? $this->imagenDe($cabecera) : null;
 
         $cambios = ['portada_revisada_en' => now()];
