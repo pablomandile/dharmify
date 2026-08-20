@@ -134,23 +134,10 @@ class BibliotecaController extends Controller
         ]);
     }
 
-    /**
-     * Las fuentes que esta persona puede ver.
-     *
-     * El administrador ve todo; quien fue invitado, sólo lo público. Es el
-     * sentido de que la fuente tenga visibilidad: hay enseñanzas que no se
-     * comparten.
-     *
-     * @return Collection<int, int>
-     */
-    private function fuentesVisibles()
+    /** @return Collection<int, int> */
+    private function fuentesVisibles(): Collection
     {
-        return Fuente::query()
-            ->when(
-                ! request()->user()?->esAdmin(),
-                fn (Builder $q) => $q->where('visibilidad', Fuente::VISIBILIDAD_PUBLICA),
-            )
-            ->pluck('id');
+        return Fuente::visiblesPara(request()->user());
     }
 
     /** @return Builder<Serie> */

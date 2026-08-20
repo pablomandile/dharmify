@@ -104,6 +104,42 @@ class PistaController extends Controller
         return response()->json(['estado' => 'listo']);
     }
 
+    /**
+     * La ficha de un puñado de pistas, para la pantalla de Descargas.
+     *
+     * Existe sólo para las que se bajaron ANTES de que guardáramos la ficha
+     * junto al audio: de ahí en más, todo lo que Descargas necesita ya está en
+     * el dispositivo y la pantalla abre sin conexión. Esto es el repuesto.
+     */
+    public function metadatos(Request $request): JsonResponse
+    {
+        $ids = collect(explode(',', (string) $request->query('ids', '')))
+            ->map(fn (string $id) => (int) trim($id))
+            ->filter()
+            ->take(500)
+            ->all();
+
+        $visibles = $this->fuentesVisibles();
+
+        $pistas = Pista::query()
+            ->with('serie:id,titulo,fuente_id,portada,portada_revisada_en')
+            ->whereIn('id', $ids)
+            ->get()
+            ->filter(fn (Pista $p) => $visibles->contains($p->serie->fuente_id))
+            ->map(fn (Pista $p) => [
+                'id' => $p->id,
+                'titulo' => $p->titulo,
+                'serie' => $p->serie->titulo,
+                'serieId' => $p->serie->id,
+                'portada' => $p->serie->urlPortada(),
+                'duracion_seg' => $p->duracion_seg,
+                'bytes' => $p->bytes,
+            ])
+            ->values();
+
+        return response()->json(['pistas' => $pistas]);
+    }
+
     /** Lo que la pantalla pollea. Nunca se cachea (va bajo /api). */
     public function estado(Pista $pista): JsonResponse
     {
@@ -331,13 +367,8 @@ class PistaController extends Controller
     }
 
     /** @return Collection<int, int> */
-    private function fuentesVisibles()
+    private function fuentesVisibles(): Collection
     {
-        return Fuente::query()
-            ->when(
-                ! request()->user()?->esAdmin(),
-                fn ($q) => $q->where('visibilidad', Fuente::VISIBILIDAD_PUBLICA),
-            )
-            ->pluck('id');
+        return Fuente::visiblesPara(request()->user());
     }
 }

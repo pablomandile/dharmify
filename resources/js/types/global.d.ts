@@ -19,6 +19,8 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             sidebarOpen: boolean;
+            /** Las carpetas del desplegable del menú. */
+            carpetas: { id: number; titulo: string; anio: number | null }[];
             [key: string]: unknown;
         };
     }

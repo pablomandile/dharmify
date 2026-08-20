@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link, router } from '@inertiajs/vue3';
-import { LayoutGrid } from '@lucide/vue';
+import { HardDriveDownload, LayoutGrid } from '@lucide/vue';
 import { onUnmounted } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import BotonInstalar from '@/components/BotonInstalar.vue';
@@ -24,6 +24,12 @@ const mainNavItems: NavItem[] = [
         title: 'Dharma',
         href: biblioteca(),
         icon: LayoutGrid,
+        desplegable: true,
+    },
+    {
+        title: 'Descargas',
+        href: '/descargas',
+        icon: HardDriveDownload,
     },
 ];
 

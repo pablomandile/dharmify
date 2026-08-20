@@ -234,7 +234,15 @@ const etiquetaTipo: Record<string, string> = {
             </p>
         </div>
 
-        <div v-else class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <!--
+            Seis por fila en escritorio. Con fichas tan angostas la carátula pasa
+            a ser cuadrada: el recorte 16/10 le comía la mitad de arriba y de
+            abajo a las genéricas, que son cuadradas y llevan el título adentro.
+        -->
+        <div
+            v-else
+            class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
+        >
             <Link
                 v-for="serie in series.data"
                 :key="serie.id"
@@ -248,7 +256,7 @@ const etiquetaTipo: Record<string, string> = {
                     quede llena de huecos grises.
                 -->
                 <div
-                    class="relative aspect-16/10 overflow-hidden bg-linear-to-br from-primary/30 via-primary/10 to-transparent"
+                    class="relative aspect-square overflow-hidden bg-linear-to-br from-primary/30 via-primary/10 to-transparent"
                 >
                     <img
                         v-if="serie.portada"

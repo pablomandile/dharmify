@@ -74,6 +74,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
      * es peor que un error de red.
      */
     Route::get('api/pistas/{pista}/estado', [PistaController::class, 'estado'])->name('pistas.estado');
+    Route::get('api/pistas/metadatos', [PistaController::class, 'metadatos'])->name('pistas.metadatos');
+
+    /*
+     * Lo que está guardado en ESTE dispositivo. La pantalla no recibe datos del
+     * servidor: los saca de la caché del navegador, porque lo que bajaste en el
+     * teléfono no está en la computadora y el servidor no tiene forma de saberlo.
+     */
+    Route::inertia('descargas', 'Descargas')->name('descargas');
 });
 
 require __DIR__.'/settings.php';

@@ -9,10 +9,31 @@ import { reactive, ref } from 'vue';
  */
 const CACHE_AUDIO = 'dharmify-audio-v1';
 
+/** La ficha de cada pista bajada. */
+export type FichaGuardada = {
+    id: number;
+    titulo: string;
+    serie: string;
+    serieId: number;
+    portada: string | null;
+    duracion_seg: number | null;
+    bytes: number;
+};
+
 const guardadas = ref<Set<number>>(new Set());
 const progreso = reactive<Record<number, string>>({});
 
 const urlAudio = (id: number) => `/pistas/${id}/audio`;
+
+/*
+ * La ficha vive en la MISMA caché que el audio, con una URL inventada que nunca
+ * se pide por red.
+ *
+ * Es lo que hace que la pantalla de Descargas abra sin conexión: si el título y
+ * la carátula hubiera que pedírselos al servidor, la lista de lo que bajaste
+ * para escuchar en el colectivo estaría vacía justo en el colectivo.
+ */
+const urlFicha = (id: number) => `/descargas/ficha/${id}.json`;
 
 const idDeUrl = (url: string) => {
     const m = url.match(/\/pistas\/(\d+)\/audio/);
@@ -42,6 +63,105 @@ const revisar = async () => {
 };
 
 /**
+ * Todo lo bajado, con su ficha y su peso real.
+ *
+ * El peso sale del `Content-Length` de la respuesta guardada y no de lo que diga
+ * el catálogo: acá interesa cuánto ocupa en ESTE teléfono.
+ */
+const listar = async (): Promise<FichaGuardada[]> => {
+    if (!('caches' in window)) {
+        return [];
+    }
+
+    const cache = await caches.open(CACHE_AUDIO);
+    const claves = await cache.keys();
+
+    const ids = claves
+        .map((req) => idDeUrl(req.url))
+        .filter((id): id is number => id !== null);
+
+    const fichas = await Promise.all(
+        ids.map(async (id) => {
+            const [guardada, audio] = await Promise.all([
+                cache.match(urlFicha(id)),
+                cache.match(urlAudio(id)),
+            ]);
+
+            const ficha: FichaGuardada | null = guardada
+                ? await guardada.json().catch(() => null)
+                : null;
+
+            const bytes = Number(audio?.headers.get('Content-Length') ?? 0);
+
+            if (ficha) {
+                return { ...ficha, id, bytes: bytes || ficha.bytes };
+            }
+
+            // Bajada antes de que guardáramos la ficha. Se completa más abajo
+            // pidiéndosela al servidor, si hay red.
+            return {
+                id,
+                titulo: '',
+                serie: '',
+                serieId: 0,
+                portada: null,
+                duracion_seg: null,
+                bytes,
+            };
+        }),
+    );
+
+    return await completarLasViejas(fichas);
+};
+
+/**
+ * Rellena las fichas de lo que se bajó antes de esta versión.
+ *
+ * Sin red no se puede: quedan con el título vacío y la pantalla las muestra
+ * igual, porque el audio está y se puede escuchar. Cuando haya conexión, la
+ * ficha se guarda y el problema no vuelve.
+ */
+const completarLasViejas = async (
+    fichas: FichaGuardada[],
+): Promise<FichaGuardada[]> => {
+    const faltan = fichas.filter((f) => !f.titulo).map((f) => f.id);
+
+    if (!faltan.length || !navigator.onLine) {
+        return fichas;
+    }
+
+    try {
+        const res = await fetch(
+            `/api/pistas/metadatos?ids=${faltan.join(',')}`,
+            {
+                headers: { Accept: 'application/json' },
+            },
+        );
+
+        if (!res.ok) {
+            return fichas;
+        }
+
+        const { pistas } = (await res.json()) as { pistas: FichaGuardada[] };
+        const porId = new Map(pistas.map((p) => [p.id, p]));
+
+        const cache = await caches.open(CACHE_AUDIO);
+
+        await Promise.all(
+            pistas.map((p) => cache.put(urlFicha(p.id), Response.json(p))),
+        );
+
+        return fichas.map((f) => {
+            const traida = porId.get(f.id);
+
+            return traida ? { ...traida, bytes: f.bytes || traida.bytes } : f;
+        });
+    } catch {
+        return fichas;
+    }
+};
+
+/**
  * Sin esto el navegador descarta lo guardado cuando necesita espacio, y la
  * persona se queda sin sus audios sin enterarse.
  */
@@ -61,7 +181,7 @@ const csrf = () =>
  * Contempla el 202: si el archivo está sólo en la nube hay que traerlo al
  * servidor primero, o se guardaría un JSON de 40 bytes en vez del audio.
  */
-const guardar = async (id: number) => {
+const guardar = async (id: number, ficha?: Omit<FichaGuardada, 'id'>) => {
     if (!('caches' in window)) {
         progreso[id] = 'Este navegador no puede guardar audio.';
 
@@ -124,6 +244,15 @@ const guardar = async (id: number) => {
             }),
         );
 
+        if (ficha) {
+            await cache.put(
+                urlFicha(id),
+                Response.json({ ...ficha, id, bytes: blob.size }),
+            );
+
+            await guardarLaPortada(cache, ficha.portada);
+        }
+
         guardadas.value = new Set([...guardadas.value, id]);
         delete progreso[id];
     } catch (e) {
@@ -137,15 +266,52 @@ const guardar = async (id: number) => {
     }
 };
 
+/**
+ * La carátula de la serie, junto al audio.
+ *
+ * Sin esto, la pantalla de Descargas sin conexión muestra la lista con todos los
+ * huecos grises: lo que se bajó para el colectivo se ve peor justo en el
+ * colectivo. Pesa unos 100 KB contra los 30 MB del audio.
+ *
+ * No se borra al quitar una pista: la comparten todas las de la serie y sale más
+ * barato dejarla que llevar la cuenta de quién la usa.
+ */
+const guardarLaPortada = async (cache: Cache, portada: string | null) => {
+    if (!portada || (await cache.match(portada))) {
+        return;
+    }
+
+    try {
+        const res = await fetch(portada);
+
+        if (res.ok) {
+            await cache.put(portada, res);
+        }
+    } catch {
+        // Que no haya carátula no es motivo para dar por fallada la descarga.
+    }
+};
+
 const borrar = async (id: number) => {
     const cache = await caches.open(CACHE_AUDIO);
-    await cache.delete(urlAudio(id));
+    await Promise.all([cache.delete(urlAudio(id)), cache.delete(urlFicha(id))]);
 
     const copia = new Set(guardadas.value);
     copia.delete(id);
     guardadas.value = copia;
 };
 
+/** Cuánto ocupa la app en el dispositivo y cuánto lugar queda. */
+const espacio = async (): Promise<{ usado: number; total: number } | null> => {
+    if (!navigator.storage?.estimate) {
+        return null;
+    }
+
+    const { usage, quota } = await navigator.storage.estimate();
+
+    return { usado: usage ?? 0, total: quota ?? 0 };
+};
+
 export function useOffline() {
-    return { guardadas, progreso, revisar, guardar, borrar };
+    return { guardadas, progreso, revisar, listar, guardar, borrar, espacio };
 }

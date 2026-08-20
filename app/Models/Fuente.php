@@ -4,8 +4,10 @@ namespace App\Models;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 /**
  * De dónde sale la biblioteca.
@@ -52,6 +54,30 @@ class Fuente extends Model
     public function series(): HasMany
     {
         return $this->hasMany(Serie::class);
+    }
+
+    /**
+     * Los ids de las fuentes que esta persona puede ver.
+     *
+     * Vive acá y no en cada controlador porque la respuesta tiene que ser la
+     * misma en los cuatro lugares que preguntan —la biblioteca, el audio, las
+     * carátulas y el menú—. Con una copia por controlador, agregar una fuente
+     * nueva significa acordarse de cuatro archivos.
+     *
+     * El administrador ve todo; quien fue invitado, sólo lo público. Es el
+     * sentido de que la fuente tenga visibilidad: hay enseñanzas que no se
+     * comparten.
+     *
+     * @return Collection<int, int>
+     */
+    public static function visiblesPara(?User $persona): Collection
+    {
+        return self::query()
+            ->when(
+                ! $persona?->esAdmin(),
+                fn (Builder $q) => $q->where('visibilidad', self::VISIBILIDAD_PUBLICA),
+            )
+            ->pluck('id');
     }
 
     public function esLocal(): bool

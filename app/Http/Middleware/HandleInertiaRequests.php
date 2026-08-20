@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Fuente;
+use App\Models\Serie;
 use Closure;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -90,6 +92,40 @@ class HandleInertiaRequests extends Middleware
             'estado' => $request->session()->get('estado'),
             'error' => $request->session()->get('error'),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+
+            /*
+             * Las carpetas para el desplegable del menú.
+             *
+             * Van compartidas y no en un endpoint aparte por dos razones: el
+             * menú está en todas las pantallas, y así el desplegable también
+             * funciona sin conexión, porque viaja dentro del HTML que el service
+             * worker ya guarda. Son 145 títulos: unos pocos KB.
+             */
+            'carpetas' => $this->carpetas($request),
         ];
+    }
+
+    /**
+     * @return array<int, array{id: int, titulo: string, anio: int|null}>
+     */
+    private function carpetas(Request $request): array
+    {
+        if (! $request->user()) {
+            return [];
+        }
+
+        return Serie::query()
+            ->whereIn('fuente_id', Fuente::visiblesPara($request->user()))
+            ->has('pistas')
+            /*
+             * Las series sin año al final: un `ORDER BY anio DESC` pone los NULL
+             * adelante en MySQL y el Programa General —que no tiene año porque
+             * corre todo el tiempo— encabezaría la lista.
+             */
+            ->orderByRaw('anio IS NULL, anio DESC')
+            ->orderBy('titulo')
+            ->get(['id', 'titulo', 'anio'])
+            ->map(fn (Serie $s) => ['id' => $s->id, 'titulo' => $s->titulo, 'anio' => $s->anio])
+            ->all();
     }
 }

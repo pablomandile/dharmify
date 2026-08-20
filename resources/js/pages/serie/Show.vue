@@ -64,6 +64,22 @@ const paraReproducir = (p: Pista) => ({
     en_nube: p.en_nube,
 });
 
+/*
+ * La ficha se guarda junto al audio, en la misma caché.
+ *
+ * Es lo que hace que la pantalla de Descargas abra sin conexión: si el título y
+ * la carátula hubiera que pedírselos al servidor, la lista de lo que bajaste
+ * para escuchar en el colectivo estaría vacía justo en el colectivo.
+ */
+const ficha = (p: Pista) => ({
+    titulo: p.titulo,
+    serie: props.serie.titulo,
+    serieId: props.serie.id,
+    portada: props.serie.portada,
+    duracion_seg: p.duracion_seg,
+    bytes: p.bytes,
+});
+
 const tocar = (p: Pista) => {
     // La cola es la serie entera: al terminar una charla sigue la que va, que
     // es como se escucha un retiro.
@@ -374,7 +390,7 @@ const duracionTotal = computed(() =>
                         @click="
                             guardadas.has(pista.id)
                                 ? borrar(pista.id)
-                                : guardar(pista.id)
+                                : guardar(pista.id, ficha(pista))
                         "
                     >
                         <Check v-if="guardadas.has(pista.id)" class="size-4" />

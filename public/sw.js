@@ -10,7 +10,7 @@
  *   2. el ?v= de los <link rel="icon"> del blade
  *   3. el ?v= de los "src" del manifest
  */
-const CACHE_APP = 'dharmify-app-v3';
+const CACHE_APP = 'dharmify-app-v4';
 
 /*
  * La caché del audio NO lleva número de versión, a propósito, y el `activate` de
@@ -147,6 +147,22 @@ self.addEventListener('fetch', (event) => {
 
     // La descarga del mp3 va siempre al servidor, nunca a la caché.
     if (/^\/pistas\/\d+\/bajar$/.test(url.pathname)) return;
+
+    /*
+     * Las carátulas de lo bajado se guardan junto al audio, así la pantalla de
+     * Descargas se ve igual sin conexión.
+     *
+     * Primero la caché sin dudar: la URL lleva ?v= con la fecha de la carátula,
+     * o sea que si la imagen cambia, cambia la URL. Una copia guardada no puede
+     * quedar vieja.
+     */
+    if (/^\/series\/\d+\/portada$/.test(url.pathname)) {
+        event.respondWith(
+            caches.match(request).then((cacheada) => cacheada || fetch(request)),
+        );
+
+        return;
+    }
 
     // Los assets de Vite llevan el hash en el nombre: si la URL existe, el
     // contenido no cambió nunca. Servirlos de caché es seguro y es lo único que
