@@ -146,12 +146,9 @@ class HandleInertiaRequests extends Middleware
         return Serie::query()
             ->whereIn('fuente_id', Fuente::visiblesPara($request->user()))
             ->has('pistas')
-            /*
-             * Las series sin año al final: un `ORDER BY anio DESC` pone los NULL
-             * adelante en MySQL y el Programa General —que no tiene año porque
-             * corre todo el tiempo— encabezaría la lista.
-             */
-            ->orderByRaw('anio IS NULL, anio DESC')
+            // Alfabético, igual que la grilla: un desplegable ordenado de otra
+            // forma que la pantalla que abre es la manera segura de no encontrar
+            // nada en ninguno de los dos.
             ->orderBy('titulo')
             ->get(['id', 'titulo', 'anio'])
             ->map(fn (Serie $s) => ['id' => $s->id, 'titulo' => $s->titulo, 'anio' => $s->anio])

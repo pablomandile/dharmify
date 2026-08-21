@@ -156,6 +156,57 @@ class CatalogoTest extends TestCase
         $this->assertSame('Mi título propio', Serie::where('anio', 2013)->value('titulo'));
     }
 
+    /**
+     * La biblioteca va alfabética por título.
+     *
+     * Antes iba por año descendente. Con 145 series lo que uno hace es buscar
+     * una en particular, y para eso el orden alfabético es el único en el que se
+     * puede adivinar dónde mirar.
+     */
+    public function test_la_biblioteca_va_ordenada_por_titulo(): void
+    {
+        $fuente = $this->fuente();
+
+        foreach ([['Zen y meditación', 2024], ['Amor sin dolor', 2010], ['Karma', 2020]] as $i => [$titulo, $anio]) {
+            $serie = Serie::create([
+                'fuente_id' => $fuente->id,
+                'carpeta' => "carpeta-{$i}",
+                'carpeta_hash' => hash('sha256', "carpeta-{$i}"),
+                'titulo' => $titulo,
+                'slug' => "serie-{$i}",
+                'anio' => $anio,
+                'idioma' => 'es',
+            ]);
+
+            $serie->pistas()->create([
+                'clave' => hash('sha256', "pista-{$i}"),
+                'titulo' => 'Una',
+                'archivo' => 'una.mp3',
+                'ruta' => "carpeta-{$i}/una.mp3",
+                'bytes' => 1000,
+                'orden' => 0,
+            ]);
+        }
+
+        $admin = User::factory()->create(['rol' => User::ROL_ADMIN]);
+
+        $this->actingAs($admin)
+            ->get('/biblioteca')
+            ->assertOk()
+            /*
+             * Los títulos van sin acento en la primera letra a propósito: las
+             * pruebas corren sobre SQLite, cuyo cotejo es binario y pone
+             * "Ángeles" DESPUÉS de la Z. Producción usa MySQL con
+             * utf8mb4_unicode_ci y lo pone con la A. Afirmar acá lo que sólo
+             * vale allá sería una prueba que miente.
+             */
+            ->assertInertia(fn ($p) => $p
+                ->where('series.data.0.titulo', 'Amor sin dolor')
+                ->where('series.data.1.titulo', 'Karma')
+                ->where('series.data.2.titulo', 'Zen y meditación'),
+            );
+    }
+
     public function test_la_pantalla_de_fuentes_es_solo_del_administrador(): void
     {
         $invitado = User::factory()->create(['rol' => User::ROL_INVITADO]);

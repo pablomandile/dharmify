@@ -55,12 +55,19 @@ class BibliotecaController extends Controller
             ->when($filtros['tipo'] ?? null, fn (Builder $q, string $tipo) => $q->where('tipo', $tipo))
             ->when($filtros['anio'] ?? null, fn (Builder $q, int $anio) => $q->where('anio', $anio))
             /*
-             * Las series sin año van al final y no al principio: un `ORDER BY
-             * anio DESC` pone los NULL adelante en MySQL, y el Programa General
-             * —que no tiene año porque corre todo el tiempo— le taparía la
-             * portada a todo lo demás.
+             * Alfabético por título.
+             *
+             * Antes iba por año descendente, que servía cuando lo último subido
+             * era lo que uno venía a buscar. Con 145 series y sus nombres ya
+             * corregidos, lo que uno hace es buscar una en particular, y para
+             * eso el orden alfabético es el único en el que se puede adivinar
+             * dónde mirar. Para lo demás están el buscador y los filtros.
+             *
+             * En producción el cotejo es utf8mb4_unicode_ci, que ignora
+             * mayúsculas y acentos: "Ángeles" cae donde uno lo busca y no al
+             * final de todo. (En las pruebas, sobre SQLite, el cotejo es binario
+             * y eso no vale.)
              */
-            ->orderByRaw('anio IS NULL, anio DESC')
             ->orderBy('titulo')
             ->paginate(24)
             ->withQueryString()
