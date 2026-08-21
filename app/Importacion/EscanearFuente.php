@@ -112,7 +112,15 @@ class EscanearFuente
              * una vez y tiene que quedar así.
              */
             $serie->update([
-                'titulo' => $titulo,
+                /*
+                 * El título sólo se recalcula si venía de la carpeta. Si salió
+                 * de la etiqueta de álbum del audio, se deja: la etiqueta es más
+                 * confiable que el nombre de la carpeta, que a veces trae typos.
+                 *
+                 * Lo demás sí se recalcula siempre, porque el tipo, el año y el
+                 * idioma están en el nombre de la carpeta y no en las etiquetas.
+                 */
+                ...($serie->titulo_origen === Serie::TITULO_CARPETA ? ['titulo' => $titulo] : []),
                 'tipo' => $taxonomia->tipo,
                 'anio' => $taxonomia->anio,
                 'idioma' => $taxonomia->idioma,

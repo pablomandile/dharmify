@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property bool $editada_a_mano
  * @property string|null $portada
  * @property string|null $portada_origen
+ * @property string $titulo_origen
  * @property CarbonImmutable|null $portada_revisada_en
  *
  * Lo que agrega `withSum('pistas', 'duracion_seg')` en la biblioteca. Va acá
@@ -33,10 +34,22 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 #[Fillable([
     'fuente_id', 'carpeta', 'carpeta_hash', 'titulo', 'slug',
-    'tipo', 'anio', 'idioma', 'portada', 'portada_revisada_en', 'portada_origen', 'editada_a_mano',
+    'titulo_origen', 'tipo', 'anio', 'idioma',
+    'portada', 'portada_revisada_en', 'portada_origen', 'editada_a_mano',
 ])]
 class Serie extends Model
 {
+    /** El título salió del nombre de la carpeta, que es el caso normal. */
+    public const TITULO_CARPETA = 'carpeta';
+
+    /**
+     * El título salió de la etiqueta de álbum del primer audio.
+     *
+     * Se marca para que el escaneo no lo pise: el título se recalcula desde la
+     * carpeta en cada refresco, y sin la marca el cambio duraría una vuelta.
+     */
+    public const TITULO_ETIQUETA = 'etiqueta';
+
     /** Del flyer de la carpeta o del encabezado de un audio. */
     public const PORTADA_ARCHIVO = 'archivo';
 
