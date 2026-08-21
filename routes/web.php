@@ -57,6 +57,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('series.portada.subir');
 
     /*
+     * Corregir el título. Sólo el administrador, por lo mismo que la carátula:
+     * es el catálogo compartido y no una preferencia de cada persona.
+     */
+    Route::patch('series/{serie}', [BibliotecaController::class, 'renombrar'])
+        ->middleware('admin')
+        ->name('series.renombrar');
+
+    /*
      * El audio. Va fuera del docroot y pasa por acá, que valida la sesión antes
      * de mandar un solo byte.
      */

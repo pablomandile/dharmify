@@ -50,6 +50,9 @@ class Serie extends Model
      */
     public const TITULO_ETIQUETA = 'etiqueta';
 
+    /** Lo corrigió una persona. No lo pisa ni el escaneo ni el barrido de etiquetas. */
+    public const TITULO_MANUAL = 'manual';
+
     /** Del flyer de la carpeta o del encabezado de un audio. */
     public const PORTADA_ARCHIVO = 'archivo';
 

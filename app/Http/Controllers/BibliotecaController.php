@@ -7,6 +7,7 @@ use App\Models\Maestro;
 use App\Models\Pista;
 use App\Models\Serie;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -132,6 +133,36 @@ class BibliotecaController extends Controller
     private function fuentesVisibles(): Collection
     {
         return Fuente::visiblesPara(request()->user());
+    }
+
+    /**
+     * Corregir el título de una serie a mano.
+     *
+     * Hace falta porque las dos fuentes automáticas fallan de maneras que ningún
+     * programa puede arreglar: el nombre de la carpeta a veces está mal escrito,
+     * y la etiqueta del mp3 también —hay un álbum que dice "Desapeo" y otro que
+     * dice "Inicición"—. Con esto se arregla en diez segundos en vez de por SQL.
+     *
+     * Queda marcado como manual, que es lo que lo protege: ni el escaneo ni el
+     * barrido de etiquetas vuelven a tocarlo.
+     */
+    public function renombrar(Request $request, Serie $serie): RedirectResponse
+    {
+        abort_unless($this->fuentesVisibles()->contains($serie->fuente_id), 404);
+
+        $datos = $request->validate([
+            'titulo' => ['required', 'string', 'max:200'],
+        ], [
+            'titulo.required' => 'El título no puede quedar vacío.',
+            'titulo.max' => 'El título no puede pasar de 200 caracteres.',
+        ]);
+
+        $serie->forceFill([
+            'titulo' => trim($datos['titulo']),
+            'titulo_origen' => Serie::TITULO_MANUAL,
+        ])->save();
+
+        return back()->with('estado', 'Título actualizado.');
     }
 
     /** @return Builder<Serie> */

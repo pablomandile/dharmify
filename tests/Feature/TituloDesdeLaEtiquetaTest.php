@@ -6,6 +6,7 @@ use App\Importacion\EscanearFuente;
 use App\Importacion\ExtraerTitulo;
 use App\Models\Fuente;
 use App\Models\Serie;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -169,6 +170,54 @@ class TituloDesdeLaEtiquetaTest extends TestCase
         $audio = str_repeat("\xFF\xFB\x90\xC0".str_repeat("\x00", 413), 40);
 
         return $etiqueta.$audio;
+    }
+
+    public function test_el_administrador_puede_corregir_el_titulo(): void
+    {
+        app(EscanearFuente::class)($this->fuente());
+
+        $serie = Serie::firstOrFail();
+        $admin = User::factory()->create(['rol' => User::ROL_ADMIN]);
+
+        $this->actingAs($admin)
+            ->patch("/series/{$serie->id}", ['titulo' => 'Talk at the University of Cambridge'])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $serie = $serie->fresh();
+
+        $this->assertSame('Talk at the University of Cambridge', $serie->titulo);
+        $this->assertSame(Serie::TITULO_MANUAL, $serie->titulo_origen);
+    }
+
+    /** Lo que hace que corregir a mano valga la pena: que no lo pise nada. */
+    public function test_lo_corregido_a_mano_sobrevive_al_refresco(): void
+    {
+        $fuente = $this->fuente();
+        app(EscanearFuente::class)($fuente);
+
+        Serie::firstOrFail()->forceFill([
+            'titulo' => 'Como lo puse yo',
+            'titulo_origen' => Serie::TITULO_MANUAL,
+        ])->save();
+
+        app(EscanearFuente::class)($fuente->fresh());
+
+        $this->assertSame('Como lo puse yo', Serie::firstOrFail()->titulo);
+    }
+
+    public function test_un_invitado_no_puede_renombrar(): void
+    {
+        app(EscanearFuente::class)($this->fuente());
+
+        $serie = Serie::firstOrFail();
+        $invitado = User::factory()->create(['rol' => User::ROL_INVITADO]);
+
+        $this->actingAs($invitado)
+            ->patch("/series/{$serie->id}", ['titulo' => 'Mio'])
+            ->assertNotFound();
+
+        $this->assertNotSame('Mio', Serie::firstOrFail()->titulo);
     }
 
     /** Las series nuevas arrancan con el título de la carpeta. */

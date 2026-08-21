@@ -17,7 +17,7 @@ use Illuminate\Support\Collection;
 class ExtraerTitulos extends Command
 {
     protected $signature = 'dharma:titulos
-        {--umbral=3 : Desde cuántas series un mismo álbum se toma como nombre de colección y se descarta}
+        {--umbral=2 : Desde cuántas series un mismo álbum se toma como nombre de colección y se descarta}
         {--paralelo=3 : Cuántas lecturas simultáneas contra la nube}
         {--aplicar : Guardar los cambios en vez de sólo mostrarlos}';
 
@@ -32,7 +32,9 @@ class ExtraerTitulos extends Command
          */
         $series = Serie::query()
             ->has('pistas')
+            // Ni lo que se editó a mano ni el título que alguien ya corrigió.
             ->where('editada_a_mano', false)
+            ->where('titulo_origen', '!=', Serie::TITULO_MANUAL)
             ->orderBy('id')
             ->get();
 
@@ -67,6 +69,11 @@ class ExtraerTitulos extends Command
          *
          * Se cuenta en vez de tener una lista de nombres prohibidos porque la
          * lista habría que adivinarla, y los datos ya saben cuáles son.
+         *
+         * El umbral es 2 porque así lo mostró la biblioteca real: las semanas 1
+         * y 2 de un mismo Summer Festival comparten álbum, y usarlo dejaría dos
+         * series con el mismo nombre. Con 3 se colaban; ningún álbum legítimo
+         * aparece repetido.
          */
         $repetidos = collect($albumes)
             ->countBy()

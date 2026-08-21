@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { ArrowLeft, ImageUp, Loader2 } from '@lucide/vue';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { ArrowLeft, ImageUp, Loader2, Pencil } from '@lucide/vue';
 import { computed, onMounted, ref } from 'vue';
 import FilaDePista from '@/components/FilaDePista.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useOffline } from '@/composables/useOffline';
 import type { FichaDePista } from '@/types/biblioteca';
 
@@ -85,6 +86,22 @@ const esAdmin = computed(() => page.props.auth?.esAdmin === true);
 const errors = computed(
     () => (page.props.errors ?? {}) as Record<string, string>,
 );
+
+/*
+ * Corregir el título a mano.
+ *
+ * Las dos fuentes automáticas fallan de maneras que ningún programa arregla: el
+ * nombre de la carpeta a veces está mal escrito y la etiqueta del mp3 también.
+ * Queda marcado como manual y ningún barrido posterior lo pisa.
+ */
+const renombrando = ref(false);
+const titulo = useForm({ titulo: props.serie.titulo });
+
+const renombrar = () =>
+    titulo.patch(`/series/${props.serie.id}`, {
+        preserveScroll: true,
+        onSuccess: () => (renombrando.value = false),
+    });
 
 const archivo = ref<HTMLInputElement | null>(null);
 const subiendo = ref(false);
@@ -197,7 +214,54 @@ const subirPortada = (evento: Event) => {
                     </Badge>
                 </div>
 
-                <h1 class="mt-2 text-2xl font-semibold">{{ serie.titulo }}</h1>
+                <form
+                    v-if="renombrando"
+                    class="mt-2 flex max-w-xl flex-wrap gap-2"
+                    @submit.prevent="renombrar"
+                >
+                    <Input
+                        v-model="titulo.titulo"
+                        class="min-w-0 flex-1"
+                        maxlength="200"
+                        autofocus
+                    />
+                    <Button
+                        type="submit"
+                        size="sm"
+                        :disabled="titulo.processing"
+                    >
+                        Guardar
+                    </Button>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        @click="renombrando = false"
+                    >
+                        Cancelar
+                    </Button>
+                </form>
+
+                <div v-else class="mt-2 flex items-start gap-2">
+                    <h1 class="text-2xl font-semibold">{{ serie.titulo }}</h1>
+
+                    <button
+                        v-if="esAdmin"
+                        class="mt-1 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        aria-label="Corregir el título"
+                        title="Corregir el título"
+                        @click="renombrando = true"
+                    >
+                        <Pencil class="size-4" />
+                    </button>
+                </div>
+
+                <p
+                    v-if="titulo.errors.titulo"
+                    class="mt-1 text-sm text-destructive"
+                >
+                    {{ titulo.errors.titulo }}
+                </p>
 
                 <p
                     v-if="serie.maestros.length"
