@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Importacion\EscanearFuente;
+use App\Importacion\ExtraerTitulo;
 use App\Models\Fuente;
 use App\Models\Serie;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -122,6 +123,52 @@ class TituloDesdeLaEtiquetaTest extends TestCase
         app(EscanearFuente::class)($fuente->fresh());
 
         $this->assertSame('Como lo puse yo', Serie::firstOrFail()->titulo);
+    }
+
+    /**
+     * El error que costó una corrida entera contra la nube: el álbum no siempre
+     * está donde uno lo busca primero.
+     *
+     * getID3 arma una vista unificada en `comments`, pero no siempre la llena.
+     * Sobre esta biblioteca hay archivos donde `comments` trae únicamente la
+     * carátula y el álbum sólo aparece en `tags`. Mirar sólo `comments` devolvía
+     * CERO álbumes sobre 145 series, sin un error que lo delatara.
+     */
+    public function test_lee_el_album_aunque_solo_este_en_la_etiqueta_id3v2(): void
+    {
+        $extraer = app(ExtraerTitulo::class);
+
+        $metodo = new \ReflectionMethod($extraer, 'albumDe');
+
+        // Un mp3 mínimo con una etiqueta ID3v2.3 que sólo declara el álbum.
+        $this->assertSame(
+            'Talk at the University of Cambridge',
+            $metodo->invoke($extraer, $this->mp3ConAlbum('Talk at the University of Cambridge')),
+        );
+    }
+
+    /** Un mp3 de verdad con su etiqueta ID3v2.3 y un par de cuadros de audio. */
+    private function mp3ConAlbum(string $album): string
+    {
+        // El primer byte del texto declara la codificación: 0 = ISO-8859-1.
+        $texto = "\x00".$album;
+        $cuadro = 'TALB'.pack('N', strlen($texto))."\x00\x00".$texto;
+
+        /*
+         * El largo de la etiqueta va en cuatro bytes "syncsafe": siete bits
+         * útiles por byte, con el octavo en cero para que la etiqueta nunca se
+         * parezca al comienzo de un cuadro de audio.
+         */
+        $largo = strlen($cuadro);
+        $syncsafe = chr(($largo >> 21) & 0x7F).chr(($largo >> 14) & 0x7F)
+            .chr(($largo >> 7) & 0x7F).chr($largo & 0x7F);
+
+        $etiqueta = 'ID3'."\x03\x00"."\x00".$syncsafe.$cuadro;
+
+        // MPEG-1 Layer III · 128 kbps · 44100 Hz · mono
+        $audio = str_repeat("\xFF\xFB\x90\xC0".str_repeat("\x00", 413), 40);
+
+        return $etiqueta.$audio;
     }
 
     /** Las series nuevas arrancan con el título de la carpeta. */

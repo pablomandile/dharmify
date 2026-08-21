@@ -91,7 +91,19 @@ class ExtraerTitulo
             file_put_contents($temporal, $cabecera);
 
             $datos = (new getID3)->analyze($temporal);
-            $album = $datos['comments']['album'][0] ?? null;
+            /*
+             * Los tres lugares donde puede estar, en orden de confianza.
+             *
+             * `comments` es la vista unificada que arma getID3 y ya viene en
+             * UTF-8, así que es la primera opción — pero NO siempre la llena:
+             * medido sobre esta biblioteca, hay archivos donde `comments` trae
+             * únicamente la carátula y el álbum sólo aparece en `tags`. Mirar
+             * sólo ahí devolvía cero álbumes sobre 145 series.
+             */
+            $album = $datos['comments']['album'][0]
+                ?? $datos['tags']['id3v2']['album'][0]
+                ?? $datos['tags']['id3v1']['album'][0]
+                ?? null;
 
             if (! is_string($album)) {
                 return null;
@@ -100,6 +112,15 @@ class ExtraerTitulo
             // Los reproductores viejos rellenan los campos ID3v1 con ceros hasta
             // completar los 30 bytes fijos, y eso llega hasta acá como basura.
             $album = trim(str_replace("\0", '', $album));
+
+            /*
+             * ID3v1 no declara codificación y en la práctica es latin-1. Sin
+             * esto, un álbum con acentos leído de ahí llega con bytes inválidos
+             * y rompe el JSON de la respuesta.
+             */
+            if (! mb_check_encoding($album, 'UTF-8')) {
+                $album = (string) mb_convert_encoding($album, 'UTF-8', 'ISO-8859-1');
+            }
 
             return $album === '' ? null : $album;
         } catch (Throwable) {
