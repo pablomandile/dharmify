@@ -130,6 +130,33 @@ class TaxonomiaDeCarpetaTest extends TestCase
         );
     }
 
+    /**
+     * Visto en los datos reales: la carpeta "Fall Festival Brasil G.Dekyong
+     * G.Jampa 2024 EN" mostraba "Brasil Guen Guen".
+     *
+     * La abreviatura se expande a "Guen Dekyong", el buscador de maestros se
+     * lleva el apellido, y el tratamiento queda solo.
+     */
+    public function test_no_deja_tratamientos_huerfanos(): void
+    {
+        $this->assertSame(
+            'Brasil',
+            TaxonomiaDeCarpeta::desde('Fall Festival Brasil G.Dekyong G.Jampa 2024 EN')->titulo,
+        );
+    }
+
+    /**
+     * Pero el tratamiento de alguien que NO está en la lista de maestros se
+     * queda: es la única forma que tiene el título de decir de quién es.
+     */
+    public function test_conserva_el_tratamiento_de_un_maestro_desconocido(): void
+    {
+        $this->assertSame(
+            'Guen Fulanito de Tal',
+            TaxonomiaDeCarpeta::desde('Charla Guen Fulanito de Tal 2019')->titulo,
+        );
+    }
+
     public function test_prefiere_no_adivinar_cuando_no_hay_maestro(): void
     {
         $t = TaxonomiaDeCarpeta::desde('Celebración Argentina del Dharma 4 B.Medicina 2017');

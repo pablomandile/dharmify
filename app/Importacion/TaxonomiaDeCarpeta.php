@@ -184,6 +184,26 @@ class TaxonomiaDeCarpeta
         $limpio = preg_replace('/\s{2,}/u', ' ', $resto);
         $limpio = trim((string) $limpio, " \t-–—.,()");
 
+        /*
+         * Tratamientos que quedaron sueltos.
+         *
+         * "Fall Festival Brasil G.Dekyong G.Jampa 2024 EN" terminaba como
+         * "Brasil Guen Guen": la abreviatura se expande a "Guen Dekyong", el
+         * buscador de maestros se lleva el apellido y el tratamiento queda
+         * huérfano.
+         *
+         * Sólo se saca el que NO tiene un nombre propio detrás. Si la carpeta
+         * nombra a alguien que no está en la lista de maestros, "Guen Fulano"
+         * sigue entero y el título conserva de quién es. Se repite porque al
+         * sacar uno puede quedar destapado el de más atrás.
+         */
+        for ($i = 0; $i < 3; $i++) {
+            $limpio = preg_replace('/(?<!\p{L})Gue(nla|she|n)(?!\p{L})(?!\s+\p{Lu})/u', ' ', (string) $limpio);
+            $limpio = preg_replace('/\s{2,}/u', ' ', (string) $limpio);
+        }
+
+        $limpio = trim((string) $limpio, " \t-–—.,()");
+
         // Repetido, porque pueden quedar dos seguidos ("de la").
         for ($i = 0; $i < 3; $i++) {
             $limpio = preg_replace("/^({$conectores})\s+/iu", '', (string) $limpio);
