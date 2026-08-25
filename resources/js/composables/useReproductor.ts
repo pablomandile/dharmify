@@ -1,4 +1,5 @@
 import { computed, reactive, ref } from 'vue';
+import { useOffline } from '@/composables/useOffline';
 
 export type PistaReproducible = {
     id: number;
@@ -43,6 +44,26 @@ if (audio) {
     audio.addEventListener('play', () => (sonando.value = true));
     audio.addEventListener('pause', () => (sonando.value = false));
     audio.addEventListener('ended', () => siguiente());
+
+    /*
+     * Un <audio> que no puede con su fuente falla en silencio: se queda quieto y
+     * no avisa nada. Fue justo lo que tapó el bug de la copia local —el server
+     * contestaba 202, el elemento no sabe qué hacer con eso y la pantalla se
+     * quedaba como si nada—. Vale para cualquier fuente que no cargue.
+     *
+     * La guarda de `actual` no sobra: cerrar() pone src en vacío, y eso también
+     * dispara un error.
+     */
+    audio.addEventListener('error', () => {
+        const pista = actual.value;
+
+        if (!pista || !audio.src) {
+            return;
+        }
+
+        avisos[pista.id] = 'No se pudo reproducir este audio.';
+        sonando.value = false;
+    });
 }
 
 const urlAudio = (id: number) => `/pistas/${id}/audio`;
@@ -53,6 +74,7 @@ const cargar = (pista: PistaReproducible) => {
     }
 
     actual.value = pista;
+    delete avisos[pista.id];
     audio.src = urlAudio(pista.id);
     audio.playbackRate = velocidad.value;
     audio.play().catch(() => {});
@@ -133,12 +155,37 @@ const avisarDuracion = () => {
 /**
  * Play sobre algo que puede no estar en el server.
  *
- * Si está sólo en la nube NO es un error: se pide traerlo y el usuario ve
- * "Trayendo de la nube…" unos segundos. Es la diferencia entre una biblioteca
- * de 928 clases y una de 20 con 908 enlaces rotos.
+ * El orden es dispositivo → server → nube, y empieza por el dispositivo a
+ * propósito: lo que se bajó para escuchar sin conexión tiene que sonar SIN
+ * conexión. Mirando primero `en_server` —que es el estado del server, no el del
+ * teléfono— darle play a algo ya bajado salía a pedirle permiso a la red para
+ * reproducir un archivo que estaba a diez centímetros, y sin señal se quedaba
+ * colgado en "Trayendo de la nube…" para siempre.
+ *
+ * Si de verdad no está en ninguna de las dos, que esté sólo en la nube NO es un
+ * error: se pide traerlo y el usuario espera unos segundos. Es la diferencia
+ * entre una biblioteca de 928 clases y una de 20 con 908 enlaces rotos.
  */
 const reproducir = async (pista: PistaReproducible) => {
-    if (pista.en_server || enServer[pista.id]) {
+    const { guardadas, estaGuardada } = useOffline();
+
+    if (
+        guardadas.value.has(pista.id) ||
+        pista.en_server ||
+        enServer[pista.id]
+    ) {
+        cargar(pista);
+
+        return;
+    }
+
+    /*
+     * El repuesto de `guardadas`, que puede estar vacío si la pantalla todavía
+     * no llamó a revisar(). Va después y no antes porque es asíncrono: en el
+     * camino normal el play tiene que salir dentro del gesto del usuario, o
+     * Safari lo bloquea por la política de reproducción automática.
+     */
+    if (await estaGuardada(pista.id)) {
         cargar(pista);
 
         return;

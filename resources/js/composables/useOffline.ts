@@ -41,6 +41,28 @@ const idDeUrl = (url: string) => {
     return m ? Number(m[1]) : null;
 };
 
+/**
+ * Si el audio de esta pista está guardado en ESTE dispositivo.
+ *
+ * Le pregunta a Cache Storage en vez de mirar `guardadas`, que se llena recién
+ * cuando alguna pantalla llama a revisar(): darle play a algo que ya se bajó no
+ * puede depender de que la pantalla de turno se haya acordado de refrescar el
+ * listado. Es la pregunta que decide si hace falta la red o no.
+ */
+const estaGuardada = async (id: number): Promise<boolean> => {
+    if (!('caches' in window)) {
+        return false;
+    }
+
+    try {
+        const cache = await caches.open(CACHE_AUDIO);
+
+        return (await cache.match(urlAudio(id))) !== undefined;
+    } catch {
+        return false;
+    }
+};
+
 /** Al abrir la app, se pinta lo que ya está guardado. */
 const revisar = async () => {
     if (!('caches' in window)) {
@@ -313,5 +335,14 @@ const espacio = async (): Promise<{ usado: number; total: number } | null> => {
 };
 
 export function useOffline() {
-    return { guardadas, progreso, revisar, listar, guardar, borrar, espacio };
+    return {
+        guardadas,
+        progreso,
+        revisar,
+        estaGuardada,
+        listar,
+        guardar,
+        borrar,
+        espacio,
+    };
 }

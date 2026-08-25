@@ -92,9 +92,14 @@ const paraReproducir = (f: FichaGuardada) => ({
     titulo: f.titulo || `Audio ${f.id}`,
     serie: f.serie,
     serieId: f.serieId,
-    // Está en el dispositivo: el service worker lo sirve de la caché sin pasar
-    // por el servidor, así que nunca hay que traerlo de la nube.
-    en_server: true,
+    /*
+     * Las dos en false y no es un descuido: esta ficha salió de la caché del
+     * dispositivo, así que el audio está acá, y el reproductor mira la copia
+     * local antes que el server y que la nube. Antes esto decía `en_server:
+     * true` para esquivar justo eso, y era la única pantalla donde sonaba lo
+     * bajado.
+     */
+    en_server: false,
     en_nube: false,
 });
 
