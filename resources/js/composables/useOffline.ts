@@ -42,12 +42,51 @@ const idDeUrl = (url: string) => {
 };
 
 /**
+ * Si lo guardado es audio de verdad y no otra cosa disfrazada.
+ *
+ * Hace falta porque `Response.ok` da true para un 202, y el 202 es justo lo que
+ * contesta el servidor —con un JSON de "Trayendo de la nube…"— cuando el
+ * archivo todavía está sólo en la nube. La versión anterior guardaba ESE JSON
+ * como si fuera el audio: aparecía el tilde verde y el play fallaba.
+ *
+ * Mira el primer byte y NO el tamaño, aunque el JSON pese 55 bytes: la pista
+ * más corta de esta biblioteca pesa 17 KB y hay seis abajo del mega, así que
+ * cualquier umbral por peso daría por rotos archivos buenos.
+ *
+ * Y descarta por lo que NO puede ser en vez de exigir una firma de mp3, porque
+ * 27 de las 928 son m4a y su cabecera es otra. Un audio jamás empieza con `{`
+ * (el JSON del 202) ni con `<` (la página de login, si venció la sesión).
+ */
+const esAudio = async (res: Response | undefined): Promise<boolean> => {
+    if (!res) {
+        return false;
+    }
+
+    try {
+        const blob = await res.clone().blob();
+
+        if (blob.size === 0) {
+            return false;
+        }
+
+        const primero = new Uint8Array(await blob.slice(0, 1).arrayBuffer())[0];
+
+        return primero !== 0x7b && primero !== 0x3c;
+    } catch {
+        return false;
+    }
+};
+
+/**
  * Si el audio de esta pista está guardado en ESTE dispositivo.
  *
  * Le pregunta a Cache Storage en vez de mirar `guardadas`, que se llena recién
  * cuando alguna pantalla llama a revisar(): darle play a algo que ya se bajó no
  * puede depender de que la pantalla de turno se haya acordado de refrescar el
  * listado. Es la pregunta que decide si hace falta la red o no.
+ *
+ * Lo que no pase el control se borra en el momento. Dejarlo sería peor que no
+ * tenerlo: el tilde verde seguiría prometiendo un audio que no existe.
  */
 const estaGuardada = async (id: number): Promise<boolean> => {
     if (!('caches' in window)) {
@@ -57,7 +96,13 @@ const estaGuardada = async (id: number): Promise<boolean> => {
     try {
         const cache = await caches.open(CACHE_AUDIO);
 
-        return (await cache.match(urlAudio(id))) !== undefined;
+        if (await esAudio(await cache.match(urlAudio(id)))) {
+            return true;
+        }
+
+        await cache.delete(urlAudio(id));
+
+        return false;
     } catch {
         return false;
     }
@@ -70,16 +115,26 @@ const revisar = async () => {
     }
 
     const cache = await caches.open(CACHE_AUDIO);
-    const claves = await cache.keys();
     const ids = new Set<number>();
 
-    claves.forEach((req) => {
+    /*
+     * De paso barre lo que haya quedado mal guardado por el bug del 202. Es el
+     * único momento en que se puede: nadie más recorre la caché entera, y
+     * mientras la entrada rota siga ahí el tilde verde miente.
+     */
+    for (const req of await cache.keys()) {
         const id = idDeUrl(req.url);
 
-        if (id) {
-            ids.add(id);
+        if (id === null) {
+            continue;
         }
-    });
+
+        if (await esAudio(await cache.match(req))) {
+            ids.add(id);
+        } else {
+            await cache.delete(req);
+        }
+    }
 
     guardadas.value = ids;
 };
@@ -98,9 +153,23 @@ const listar = async (): Promise<FichaGuardada[]> => {
     const cache = await caches.open(CACHE_AUDIO);
     const claves = await cache.keys();
 
-    const ids = claves
-        .map((req) => idDeUrl(req.url))
-        .filter((id): id is number => id !== null);
+    const ids: number[] = [];
+
+    for (const req of claves) {
+        const id = idDeUrl(req.url);
+
+        if (id === null) {
+            continue;
+        }
+
+        // Lo mismo que hace revisar(): una entrada que no es audio no se lista,
+        // se borra. Ver esAudio().
+        if (await esAudio(await cache.match(req))) {
+            ids.push(id);
+        } else {
+            await cache.delete(req);
+        }
+    }
 
     const fichas = await Promise.all(
         ids.map(async (id) => {
@@ -197,11 +266,74 @@ const csrf = () =>
     document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
         ?.content ?? '';
 
+/*
+ * Cuánto se insiste con un archivo que se está trayendo de la nube: 45 vueltas
+ * de 4 segundos, tres minutos.
+ *
+ * Traer el archivo corre DENTRO de la petición —no hay cola de trabajos, haría
+ * falta un cron— y una clase de 60 MB tarda entre 45 s y 2 min. El proxy corta
+ * bastante antes, y ahí está la trampa: la petición muere pero el archivo del
+ * otro lado sigue viniendo. Darlo por perdido en ese momento es lo que hacía
+ * fallar las descargas grandes, que en esta biblioteca son casi todas: 922 de
+ * las 928 pistas están sólo en la nube.
+ */
+const ESPERA_MS = 4000;
+const INTENTOS = 45;
+
+/**
+ * Pide traer el archivo al server y espera hasta que esté, sin creerle a la
+ * primera respuesta que se corte.
+ */
+const traerDeLaNube = async (id: number): Promise<Response> => {
+    let estado: string | null = null;
+
+    progreso[id] = 'Trayendo de la nube…';
+
+    try {
+        const res = await fetch(`/pistas/${id}/restaurar`, {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+        });
+
+        estado = ((await res.json()) as { estado?: string }).estado ?? null;
+    } catch {
+        // Se cortó la petición, pero el archivo puede seguir bajando del otro
+        // lado: eso lo resuelve el bucle de abajo.
+    }
+
+    /*
+     * Un "no" explícito del servidor es definitivo. Insistir tres minutos con
+     * algo que ya contestó que no se puede es sólo hacer esperar al pedo.
+     */
+    if (estado === 'error' || estado === 'no_disponible') {
+        return new Response(null, { status: 502 });
+    }
+
+    const desde = Date.now();
+
+    for (let i = 0; i < INTENTOS; i++) {
+        const res = await fetch(urlAudio(id));
+
+        if (res.status !== 202) {
+            return res;
+        }
+
+        await res.body?.cancel();
+
+        const segundos = Math.round((Date.now() - desde) / 1000);
+        progreso[id] = `Trayendo de la nube… ${segundos}s`;
+
+        await new Promise((listo) => setTimeout(listo, ESPERA_MS));
+    }
+
+    return new Response(null, { status: 202 });
+};
+
 /**
  * Baja el audio y lo guarda en el dispositivo, mostrando el porcentaje.
  *
  * Contempla el 202: si el archivo está sólo en la nube hay que traerlo al
- * servidor primero, o se guardaría un JSON de 40 bytes en vez del audio.
+ * servidor primero, o se guardaría el JSON del aviso en vez del audio.
  */
 const guardar = async (id: number, ficha?: Omit<FichaGuardada, 'id'>) => {
     if (!('caches' in window)) {
@@ -217,18 +349,27 @@ const guardar = async (id: number, ficha?: Omit<FichaGuardada, 'id'>) => {
         let res = await fetch(urlAudio(id));
 
         if (res.status === 202) {
-            progreso[id] = 'Trayendo de la nube…';
-            await fetch(`/pistas/${id}/restaurar`, {
-                method: 'POST',
-                headers: { 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
-            });
-            res = await fetch(urlAudio(id));
+            res = await traerDeLaNube(id);
         }
 
-        if (!res.ok || !res.body) {
-            throw new Error('no se pudo descargar');
+        /*
+         * `res.ok` no alcanza, y ése era el bug: para fetch cualquier 2xx es
+         * "ok", y el 202 de "todavía está en la nube" entra ahí. Con `ok` se
+         * guardaba el JSON del aviso como si fuera el audio, aparecía el tilde
+         * verde y el play fallaba.
+         */
+        if (res.status !== 200 || !res.body) {
+            progreso[id] =
+                res.status === 202
+                    ? 'La nube tardó demasiado. Probá de nuevo.'
+                    : 'No se pudo descargar.';
+
+            return;
         }
 
+        // El tipo real, no uno inventado: 27 de las 928 son m4a, y declararlas
+        // mp3 hace que algunos navegadores se nieguen a reproducirlas.
+        const tipo = res.headers.get('Content-Type') || 'audio/mpeg';
         const total = Number(res.headers.get('Content-Length') || 0);
         const lector = res.body.getReader();
         const partes: BlobPart[] = [];
@@ -249,7 +390,18 @@ const guardar = async (id: number, ficha?: Omit<FichaGuardada, 'id'>) => {
             }
         }
 
-        const blob = new Blob(partes, { type: 'audio/mpeg' });
+        const blob = new Blob(partes, { type: tipo });
+
+        /*
+         * Último control antes de escribir. Un 200 tampoco garantiza audio: si
+         * venció la sesión, lo que llega es el HTML del login.
+         */
+        if (!(await esAudio(new Response(blob)))) {
+            progreso[id] = 'Lo que llegó no era el audio. Probá de nuevo.';
+
+            return;
+        }
+
         const cache = await caches.open(CACHE_AUDIO);
 
         // Los headers explícitos no son decorativos: son los que después usa el
@@ -259,7 +411,7 @@ const guardar = async (id: number, ficha?: Omit<FichaGuardada, 'id'>) => {
             new Response(blob, {
                 status: 200,
                 headers: {
-                    'Content-Type': 'audio/mpeg',
+                    'Content-Type': tipo,
                     'Content-Length': String(blob.size),
                     'Accept-Ranges': 'bytes',
                 },

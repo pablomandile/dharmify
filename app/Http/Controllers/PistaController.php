@@ -55,7 +55,7 @@ class PistaController extends Controller
             'reproducciones' => $pista->reproducciones + 1,
         ])->save();
 
-        return $this->enviar($archivo);
+        return $this->enviar($archivo, $this->tipoDe($pista->archivo));
     }
 
     /**
@@ -185,7 +185,12 @@ class PistaController extends Controller
             return response()->json(['estado' => 'en_nube'], 202);
         }
 
-        return $this->enviar($archivo, descargar: true, nombre: $pista->archivo);
+        return $this->enviar(
+            $archivo,
+            $this->tipoDe($pista->archivo),
+            descargar: true,
+            nombre: $pista->archivo,
+        );
     }
 
     /**
@@ -259,7 +264,28 @@ class PistaController extends Controller
      * cortar con connection_aborted() (si no, cada vez que alguien cambia de
      * pista queda un proceso leyendo el archivo entero al vacío).
      */
-    private function enviar(string $archivo, bool $descargar = false, string $nombre = ''): StreamedResponse
+    /**
+     * El tipo MIME de verdad, sacado del nombre ORIGINAL.
+     *
+     * No se puede sacar del archivo en el server: `rutaEnElServer()` guarda todo
+     * como .mp3, sea lo que sea. Y no alcanza con decir siempre "audio/mpeg"
+     * porque 27 de las 928 pistas son m4a: declararlas mp3 hace que algunos
+     * navegadores se nieguen a reproducirlas, y como acá al lado va
+     * `X-Content-Type-Options: nosniff`, no pueden corregir el error mirando el
+     * archivo. Es exactamente lo que les prohibimos hacer.
+     */
+    private function tipoDe(string $nombre): string
+    {
+        return match (strtolower(pathinfo($nombre, PATHINFO_EXTENSION))) {
+            'm4a', 'm4b', 'mp4', 'aac' => 'audio/mp4',
+            'ogg', 'oga', 'opus' => 'audio/ogg',
+            'wav' => 'audio/wav',
+            'flac' => 'audio/flac',
+            default => 'audio/mpeg',
+        };
+    }
+
+    private function enviar(string $archivo, string $tipo = 'audio/mpeg', bool $descargar = false, string $nombre = ''): StreamedResponse
     {
         $tam = filesize($archivo);
         $inicio = 0;
@@ -291,7 +317,7 @@ class PistaController extends Controller
         $largo = $fin - $inicio + 1;
 
         $cabeceras = [
-            'Content-Type' => 'audio/mpeg',
+            'Content-Type' => $tipo,
             'Accept-Ranges' => 'bytes',
             'Content-Length' => (string) $largo,
             'Cache-Control' => 'private, max-age=0, no-store',

@@ -43,11 +43,19 @@ async function servirAudio(request) {
     const rango = request.headers.get('range');
     const blob = await guardado.blob();
 
+    /*
+     * El tipo con el que se guardó, no uno fijo: 27 de las 928 son m4a. Servir
+     * AAC diciendo "audio/mpeg" hace que algunos navegadores se nieguen a
+     * reproducirlo, y encima el server manda `nosniff`, que les prohíbe
+     * corregirnos el error mirando el archivo.
+     */
+    const tipo = guardado.headers.get('Content-Type') || 'audio/mpeg';
+
     if (!rango) {
         return new Response(blob, {
             status: 200,
             headers: {
-                'Content-Type': 'audio/mpeg',
+                'Content-Type': tipo,
                 'Content-Length': String(blob.size),
                 'Accept-Ranges': 'bytes',
             },
@@ -77,7 +85,7 @@ async function servirAudio(request) {
     return new Response(trozo, {
         status: 206,
         headers: {
-            'Content-Type': 'audio/mpeg',
+            'Content-Type': tipo,
             'Content-Length': String(trozo.size),
             'Content-Range': 'bytes ' + inicio + '-' + fin + '/' + blob.size,
             'Accept-Ranges': 'bytes',
