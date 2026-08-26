@@ -14,10 +14,12 @@ class TextoExtraido
 {
     /**
      * @param  list<array{inicio: float, fin: float, texto: string}>|null  $marcas
+     * @param  string|null  $encabezado  lo que va antes de la primera marca
      */
     public function __construct(
         public readonly string $texto,
         public readonly ?array $marcas = null,
+        public readonly ?string $encabezado = null,
     ) {}
 
     /**

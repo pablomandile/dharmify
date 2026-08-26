@@ -128,6 +128,7 @@ class ExtraerTranscripcion
             [
                 'archivo' => $nombre,
                 'formato' => $formato,
+                'encabezado' => $extraido?->encabezado,
                 'origen' => $origen,
                 'texto' => $extraido?->texto,
                 'marcas' => $extraido?->marcas,

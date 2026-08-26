@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Importacion\DocumentoDeTexto;
 use App\Importacion\EscanearFuente;
 use App\Importacion\ExtraerTranscripcion;
 use App\Importacion\Lectores\LectorDeFuente;
@@ -15,6 +16,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -493,6 +495,311 @@ class TranscripcionTest extends TestCase
             ->assertSessionHasErrors('documento');
 
         $this->assertSame(0, Transcripcion::count());
+    }
+
+    // ---------------------------------------------------------------- corregir
+
+    /**
+     * La prueba que sostiene todo lo demás.
+     *
+     * Corregir el texto obliga a volver a escribir el documento, y el documento
+     * escrito lo vuelve a leer el importador de siempre. Si el que escribe y el
+     * que lee no coincidieran, cada corrección iría deformando la transcripción
+     * un poco más, sin que nada lo avise.
+     */
+    public function test_un_docx_escrito_por_nosotros_se_vuelve_a_leer_igual(): void
+    {
+        $tramos = [
+            ['inicio' => 3.0, 'fin' => 279.0, 'texto' => 'Buenas tardes, ahora empezamos.'],
+            ['inicio' => 280.0, 'fin' => 492.0, 'texto' => 'Y la función del comentario.'],
+            ['inicio' => 493.0, 'fin' => 720.0, 'texto' => 'Sentémonos con la espalda recta.'],
+            ['inicio' => 3753.0, 'fin' => 3900.0, 'texto' => 'Con «comillas» y <inaudible>.'],
+        ];
+
+        $bytes = app(DocumentoDeTexto::class)->docx('02 Celebración 2015', $tramos);
+
+        $this->assertNotNull($bytes);
+
+        $vuelta = app(TextoDeDocumento::class)((string) $bytes, 'clase.docx');
+
+        $this->assertNotNull($vuelta);
+        $this->assertSame($tramos, $vuelta->marcas);
+        $this->assertSame('02 Celebración 2015', $vuelta->encabezado);
+    }
+
+    /** Lo mismo con el .srt, contra el parser que ya existía. */
+    public function test_un_srt_escrito_por_nosotros_se_vuelve_a_leer_igual(): void
+    {
+        $tramos = [
+            ['inicio' => 12.5, 'fin' => 15.2, 'texto' => 'Buenas tardes a todos,'],
+            ['inicio' => 15.3, 'fin' => 18.0, 'texto' => 'vamos a empezar.'],
+        ];
+
+        $bytes = app(DocumentoDeTexto::class)->srt($tramos);
+
+        $this->assertNotNull($bytes);
+
+        $vuelta = app(TextoDeDocumento::class)((string) $bytes, 'clase.srt');
+
+        $this->assertNotNull($vuelta);
+        $this->assertSame($tramos, $vuelta->marcas);
+    }
+
+    /**
+     * Lo encontró la prueba de ida y vuelta: el parser usaba `strip_tags()`, que
+     * borra cualquier cosa entre `<` y `>`. En una transcripción, marcar con
+     * "<inaudible>" lo que no se entendió es de lo más normal — y desaparecía.
+     */
+    public function test_un_signo_menor_en_el_texto_no_se_come_nada(): void
+    {
+        $tramos = [
+            ['inicio' => 1.0, 'fin' => 3.0, 'texto' => 'Dijo algo <inaudible> acá.'],
+            ['inicio' => 4.0, 'fin' => 6.0, 'texto' => 'Y siguió.'],
+        ];
+
+        $vuelta = app(TextoDeDocumento::class)(
+            (string) app(DocumentoDeTexto::class)->srt($tramos),
+            'clase.srt',
+        );
+
+        $this->assertSame('Dijo algo <inaudible> acá.', $vuelta?->marcas[0]['texto']);
+    }
+
+    /** Pero las etiquetas que .vtt sí define se siguen sacando. */
+    public function test_las_etiquetas_de_voz_de_un_vtt_se_siguen_sacando(): void
+    {
+        $vuelta = app(TextoDeDocumento::class)(
+            "WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nHola <v Guen>mundo</v>\n",
+            'clase.vtt',
+        );
+
+        $this->assertSame('Hola mundo', $vuelta?->marcas[0]['texto']);
+    }
+
+    /** Deja una transcripción con marcas lista para corregir. */
+    private function conTramos(): Pista
+    {
+        $this->enLaCarpeta('Clase 1.mp3');
+        $this->docx(
+            $this->enLaCarpeta('Clase 1.docx'),
+            'Clase 1',
+            '(0:01 - 0:10)', 'Primer tramo.',
+            '(0:11 - 0:20)', 'Segundo tramo.',
+            '(0:21 - 0:30)', 'Tercer tramo.',
+            '(0:31 - 0:40)', 'Cuarto tramo.',
+        );
+
+        $fuente = $this->fuente();
+        app(EscanearFuente::class)($fuente);
+        $this->barrer($fuente);
+
+        return Pista::firstOrFail();
+    }
+
+    /**
+     * @param  list<array{inicio: float, fin: float, texto: string}>  $tramos
+     */
+    private function corregir(Pista $pista, array $tramos, string $encabezado = 'Clase 1'): TestResponse
+    {
+        return $this->actingAs($this->admin())
+            ->put("/pistas/{$pista->id}/transcripcion", [
+                'encabezado' => $encabezado,
+                'tramos' => $tramos,
+            ]);
+    }
+
+    public function test_corregir_un_tramo_no_toca_los_demas(): void
+    {
+        $pista = $this->conTramos();
+        $tramos = $pista->transcripcion?->marcas ?? [];
+
+        $tramos[1]['texto'] = 'Segundo tramo, ya corregido.';
+
+        $this->corregir($pista, $tramos)->assertRedirect()->assertSessionHasNoErrors();
+
+        $despues = $pista->fresh()?->transcripcion?->marcas ?? [];
+
+        $this->assertCount(4, $despues);
+        $this->assertSame('Segundo tramo, ya corregido.', $despues[1]['texto']);
+        $this->assertSame('Primer tramo.', $despues[0]['texto']);
+
+        /*
+         * Y sobre todo: los tiempos siguen donde estaban. Se compara con
+         * `assertEquals` y no `assertSame` porque las marcas vuelven de la base
+         * pasando por JSON, y ahí un 11.0 redondo vuelve como entero.
+         */
+        $this->assertEquals(11, $despues[1]['inicio']);
+        $this->assertEquals(20, $despues[1]['fin']);
+    }
+
+    /** La corrección tiene que llegar a la nube, o el barrido la borra. */
+    public function test_corregir_reescribe_el_documento_en_la_nube(): void
+    {
+        $pista = $this->conTramos();
+        $tramos = $pista->transcripcion?->marcas ?? [];
+        $tramos[0]['texto'] = 'Primer tramo, corregido en la nube.';
+
+        $this->corregir($pista, $tramos)->assertSessionHasNoErrors();
+
+        $enLaNube = (string) file_get_contents(
+            $this->raiz.'/'.self::CARPETA.'/Clase 1.docx',
+        );
+
+        $vuelta = app(TextoDeDocumento::class)($enLaNube, 'Clase 1.docx');
+
+        $this->assertSame('Primer tramo, corregido en la nube.', $vuelta?->marcas[0]['texto']);
+    }
+
+    /** Lo pedido: si además hay un .srt, se corrige también. */
+    public function test_si_hay_un_srt_al_lado_tambien_se_corrige(): void
+    {
+        $pista = $this->conTramos();
+
+        $this->enLaCarpeta('Clase 1.srt', "1\n00:00:01,000 --> 00:00:10,000\nViejo.\n");
+
+        $tramos = $pista->transcripcion?->marcas ?? [];
+        $tramos[0]['texto'] = 'Nuevo texto.';
+
+        $this->corregir($pista, $tramos)->assertSessionHasNoErrors();
+
+        $srt = (string) file_get_contents($this->raiz.'/'.self::CARPETA.'/Clase 1.srt');
+
+        $this->assertStringContainsString('Nuevo texto.', $srt);
+        $this->assertStringNotContainsString('Viejo.', $srt);
+    }
+
+    /** Y lo pedido explícitamente: si no hay .srt, no se inventa uno. */
+    public function test_si_no_hay_srt_no_se_crea(): void
+    {
+        $pista = $this->conTramos();
+        $tramos = $pista->transcripcion?->marcas ?? [];
+        $tramos[0]['texto'] = 'Corregido.';
+
+        $this->corregir($pista, $tramos)->assertSessionHasNoErrors();
+
+        $this->assertFileDoesNotExist($this->raiz.'/'.self::CARPETA.'/Clase 1.srt');
+        $this->assertFileDoesNotExist($this->raiz.'/'.self::CARPETA.'/Clase 1.txt');
+    }
+
+    /**
+     * El original se guarda antes de tocar nada, y sólo la primera vez: si se
+     * guardara en cada corrección, la segunda pisaría el respaldo con la primera
+     * y dejaría de ser el original.
+     */
+    public function test_la_copia_del_original_se_hace_una_vez_y_no_se_pisa(): void
+    {
+        $pista = $this->conTramos();
+        $respaldo = 'transcripciones/originales/'.$pista->clave.'.docx';
+
+        $tramos = $pista->transcripcion?->marcas ?? [];
+        $tramos[0]['texto'] = 'Primera corrección.';
+        $this->corregir($pista, $tramos)->assertSessionHasNoErrors();
+
+        Storage::disk('local')->assertExists($respaldo);
+
+        $original = (string) Storage::disk('local')->get($respaldo);
+
+        $tramos[0]['texto'] = 'Segunda corrección.';
+        $this->corregir($pista->fresh() ?? $pista, $tramos)->assertSessionHasNoErrors();
+
+        $this->assertSame(
+            $original,
+            (string) Storage::disk('local')->get($respaldo),
+            'la segunda corrección pisó el respaldo del original',
+        );
+
+        // Y el respaldo es de verdad el texto de antes de todo.
+        $vuelta = app(TextoDeDocumento::class)($original, 'x.docx');
+        $this->assertSame('Primer tramo.', $vuelta?->marcas[0]['texto']);
+    }
+
+    /** Si la escritura no llega a la nube, la base no se toca. */
+    public function test_si_la_correccion_no_llega_a_la_nube_no_se_guarda_nada(): void
+    {
+        $pista = $this->conTramos();
+        $antes = $pista->transcripcion?->texto;
+
+        $this->app->bind(EscanearFuente::class, fn () => new class extends EscanearFuente
+        {
+            public function lectorPara(Fuente $fuente): LectorDeFuente
+            {
+                return new class extends LectorLocal
+                {
+                    private int $consultas = 0;
+
+                    /*
+                     * A cada formato se le pregunta dos veces: primero "¿existe
+                     * este documento al lado del audio?" y después "¿llegó lo
+                     * que acabo de escribir?". Éste dice que sí y después que
+                     * no, que es la única forma de ejercitar la verificación:
+                     * con el lector de verdad las dos respuestas coinciden
+                     * siempre y la prueba pasaría sin comprobar nada.
+                     */
+                    public function existe(string $raiz, string $ruta): bool
+                    {
+                        return ++$this->consultas === 1;
+                    }
+
+                    public function subir(string $raiz, string $ruta, string $origen): bool
+                    {
+                        return true;
+                    }
+                };
+            }
+        });
+
+        $tramos = $pista->transcripcion?->marcas ?? [];
+        $tramos[0]['texto'] = 'Esto no debería quedar.';
+
+        $this->corregir($pista, $tramos);
+
+        $this->assertSame($antes, $pista->fresh()?->transcripcion?->texto);
+    }
+
+    public function test_no_se_puede_dejar_la_transcripcion_vacia(): void
+    {
+        $pista = $this->conTramos();
+
+        $this->actingAs($this->admin())
+            ->put("/pistas/{$pista->id}/transcripcion", ['encabezado' => '', 'tramos' => []])
+            ->assertSessionHasErrors('texto');
+    }
+
+    public function test_solo_el_administrador_corrige(): void
+    {
+        $pista = $this->conTramos();
+
+        $invitado = User::factory()->create(['rol' => User::ROL_INVITADO]);
+        Invitacion::create(['email' => $invitado->email, 'aceptada_en' => now()]);
+
+        $this->actingAs($invitado)
+            ->put("/pistas/{$pista->id}/transcripcion", ['tramos' => []])
+            ->assertNotFound();
+    }
+
+    /** Las 64 sin marcas se corrigen como texto plano y siguen sin marcas. */
+    public function test_una_transcripcion_sin_marcas_se_corrige_como_texto(): void
+    {
+        $this->enLaCarpeta('Clase 1.mp3');
+        $this->docx($this->enLaCarpeta('Clase 1.docx'), 'Escrita a mano.', 'Sin tiempos.');
+
+        $fuente = $this->fuente();
+        app(EscanearFuente::class)($fuente);
+        $this->barrer($fuente);
+
+        $pista = Pista::firstOrFail();
+        $this->assertNull($pista->transcripcion?->marcas);
+
+        $this->actingAs($this->admin())
+            ->put("/pistas/{$pista->id}/transcripcion", [
+                'texto' => "Escrita a mano.\n\nYa corregida.",
+            ])
+            ->assertSessionHasNoErrors();
+
+        $despues = $pista->fresh()?->transcripcion;
+
+        $this->assertNull($despues?->marcas);
+        $this->assertStringContainsString('Ya corregida.', (string) $despues?->texto);
     }
 
     // ----------------------------------------------------------------- servir

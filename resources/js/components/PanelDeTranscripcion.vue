@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { Download, FileUp, Maximize2 } from '@lucide/vue';
-import { computed, onUnmounted, ref, useTemplateRef } from 'vue';
+import { Check, Download, FileUp, Maximize2, Pencil, X } from '@lucide/vue';
+import { computed, onMounted, onUnmounted, ref, useTemplateRef } from 'vue';
 import TextoDeTranscripcion from '@/components/TextoDeTranscripcion.vue';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +12,7 @@ import {
     SheetTitle,
 } from '@/components/ui/sheet';
 import { Spinner } from '@/components/ui/spinner';
+import type { Marca } from '@/composables/useTranscripcion';
 import { useTranscripcion } from '@/composables/useTranscripcion';
 
 /**
@@ -77,10 +78,114 @@ const subir = (evento: Event) => {
 };
 
 /*
+ * Corregir escribe en OneDrive, así que sin conexión no se puede: el lápiz no
+ * aparece. Decirlo con el botón ausente es más claro que dejarlo y fallar al
+ * guardar, cuando el trabajo ya está hecho.
+ */
+const enLinea = ref(true);
+const mirarLaRed = () => (enLinea.value = navigator.onLine);
+
+onMounted(() => {
+    mirarLaRed();
+    window.addEventListener('online', mirarLaRed);
+    window.addEventListener('offline', mirarLaRed);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('online', mirarLaRed);
+    window.removeEventListener('offline', mirarLaRed);
+});
+
+const puedeEditar = computed(
+    () => esAdmin.value && enLinea.value && Boolean(ficha.value?.seEdita),
+);
+
+const editando = ref(false);
+const guardando = ref(false);
+
+/*
+ * El borrador es una copia: mientras se corrige, lo que se ve en pantalla no es
+ * lo guardado. Cancelar tiene que devolver todo como estaba, y sin la copia
+ * habría que volver a pedirlo al servidor para deshacer.
+ */
+const borrador = ref<{ encabezado: string; tramos: Marca[]; texto: string }>({
+    encabezado: '',
+    tramos: [],
+    texto: '',
+});
+
+const empezarAEditar = () => {
+    borrador.value = {
+        encabezado: ficha.value?.encabezado ?? '',
+        tramos: (ficha.value?.marcas ?? []).map((m) => ({ ...m })),
+        texto: ficha.value?.texto ?? '',
+    };
+
+    problema.value = null;
+    editando.value = true;
+};
+
+/** Cuántos segundos, en el reloj de siempre: 279 → "4:39". */
+const reloj = (segundos: number) => {
+    const total = Math.round(segundos);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    const dos = (n: number) => String(n).padStart(2, '0');
+
+    return h > 0 ? `${h}:${dos(m)}:${dos(s)}` : `${m}:${dos(s)}`;
+};
+
+/**
+ * Guarda la corrección, que va a parar a los documentos de OneDrive.
+ *
+ * Con marcas van los tramos, cada uno con su tiempo intacto; sin marcas —64 de
+ * las 644— va el texto y nada más.
+ */
+const guardar = () => {
+    const pista = pistaAbierta.value;
+
+    if (pista === null) {
+        return;
+    }
+
+    problema.value = null;
+    guardando.value = true;
+
+    const conTramos = borrador.value.tramos.length > 0;
+
+    useForm(
+        conTramos
+            ? {
+                  encabezado: borrador.value.encabezado,
+                  tramos: borrador.value.tramos,
+              }
+            : { texto: borrador.value.texto },
+    ).put(`/pistas/${pista}/transcripcion`, {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: async () => {
+            editando.value = false;
+            await recargar();
+        },
+        onError: (errores) => {
+            problema.value =
+                errores.texto ?? errores.tramos ?? 'No se pudo guardar.';
+        },
+        onFinish: () => (guardando.value = false),
+    });
+};
+
+/*
  * En una SPA, navegar no desmonta los overlays: sin esto, el panel queda abierto
  * tapando la pantalla nueva. Es el mismo arreglo que ya tiene el menú lateral.
  */
-onUnmounted(router.on('navigate', cerrar));
+onUnmounted(
+    router.on('navigate', () => {
+        editando.value = false;
+        cerrar();
+    }),
+);
 </script>
 
 <template>
@@ -103,7 +208,7 @@ onUnmounted(router.on('navigate', cerrar));
 
                 <div v-if="ficha" class="flex flex-wrap gap-2 pt-1">
                     <Button
-                        v-if="ficha.texto"
+                        v-if="ficha.texto && !editando"
                         :as="Link"
                         :href="ficha.urlCompleta"
                         variant="outline"
@@ -114,6 +219,7 @@ onUnmounted(router.on('navigate', cerrar));
                     </Button>
 
                     <Button
+                        v-if="!editando"
                         :as="'a'"
                         :href="ficha.urlBajar"
                         variant="ghost"
@@ -124,7 +230,38 @@ onUnmounted(router.on('navigate', cerrar));
                     </Button>
 
                     <Button
-                        v-if="esAdmin"
+                        v-if="puedeEditar && !editando"
+                        variant="ghost"
+                        size="sm"
+                        @click="empezarAEditar"
+                    >
+                        <Pencil class="size-4" />
+                        Corregir
+                    </Button>
+
+                    <template v-if="editando">
+                        <Button
+                            size="sm"
+                            :disabled="guardando"
+                            @click="guardar"
+                        >
+                            <Spinner v-if="guardando" />
+                            <Check v-else class="size-4" />
+                            Guardar
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            :disabled="guardando"
+                            @click="editando = false"
+                        >
+                            <X class="size-4" />
+                            Cancelar
+                        </Button>
+                    </template>
+
+                    <Button
+                        v-if="esAdmin && !editando"
                         variant="ghost"
                         size="sm"
                         :disabled="subiendo"
@@ -173,6 +310,49 @@ onUnmounted(router.on('navigate', cerrar));
                             trae las marcas de tiempo.
                         </p>
                     </div>
+                </div>
+
+                <!--
+                    Un cuadro por tramo, con su minuto al costado. Corregir tramo
+                    por tramo y no todo de una es lo que hace que los tiempos
+                    sigan pegados a su texto sin recalcular nada — y de paso es
+                    lo que uno quiere: estás escuchando el minuto 4 y arreglás
+                    justo ese pedazo.
+                -->
+                <div v-else-if="editando" class="space-y-4">
+                    <div class="grid gap-1.5">
+                        <label class="text-xs text-muted-foreground">
+                            Encabezado
+                        </label>
+                        <textarea
+                            v-model="borrador.encabezado"
+                            rows="1"
+                            class="w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                        />
+                    </div>
+
+                    <div
+                        v-for="(tramo, i) in borrador.tramos"
+                        :key="i"
+                        class="grid gap-1.5"
+                    >
+                        <label class="font-mono text-xs text-muted-foreground">
+                            {{ reloj(tramo.inicio) }} – {{ reloj(tramo.fin) }}
+                        </label>
+                        <textarea
+                            v-model="tramo.texto"
+                            rows="4"
+                            class="w-full rounded-md border bg-transparent px-3 py-2 text-sm leading-relaxed shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                        />
+                    </div>
+
+                    <!-- Las 64 sin marcas: no hay tramos que separar. -->
+                    <textarea
+                        v-if="!borrador.tramos.length"
+                        v-model="borrador.texto"
+                        rows="24"
+                        class="w-full rounded-md border bg-transparent px-3 py-2 text-sm leading-relaxed shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    />
                 </div>
 
                 <template v-else-if="ficha">

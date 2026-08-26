@@ -24,6 +24,8 @@ const fichaFalsa = (pista: number) => ({
     serie: 'Retiro de Vacuidad',
     serieId: 3,
     formato: 'docx',
+    encabezado: 'Primera charla',
+    seEdita: true,
     palabras: 4200,
     texto: 'Buenas tardes a todos.',
     marcas: null,

@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $pista_id
  * @property string $archivo
  * @property string $formato
+ * @property string|null $encabezado
  * @property string $origen
  * @property string|null $texto
  * @property array<int, array{inicio: float, fin: float, texto: string}>|null $marcas
@@ -26,7 +27,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['pista_id', 'archivo', 'formato', 'origen', 'texto', 'marcas', 'palabras', 'bytes'])]
+#[Fillable(['pista_id', 'archivo', 'formato', 'encabezado', 'origen', 'texto', 'marcas', 'palabras', 'bytes'])]
 class Transcripcion extends Model
 {
     protected $table = 'transcripciones';

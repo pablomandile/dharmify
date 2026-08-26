@@ -123,6 +123,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('pistas.transcripcion.subir');
 
     /*
+     * Corregir el texto desde el panel. Admin por lo mismo que subir: esto
+     * reescribe los documentos que están en OneDrive.
+     */
+    Route::put('pistas/{pista}/transcripcion', [TranscripcionController::class, 'editar'])
+        ->middleware('admin')
+        ->name('pistas.transcripcion.editar');
+
+    /*
      * El estado va bajo /api porque el service worker tiene prohibido cachear
      * esa rama: una copia vieja diciendo "en la nube" cuando el archivo ya está
      * es peor que un error de red.

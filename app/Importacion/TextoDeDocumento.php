@@ -205,9 +205,12 @@ class TextoDeDocumento
             return new TextoExtraido(implode("\n\n", $parrafos));
         }
 
+        $encabezado = trim(implode("\n\n", $sueltos));
+
         return new TextoExtraido(
             implode("\n\n", array_merge($sueltos, array_column($marcas, 'texto'))),
             $marcas,
+            $encabezado === '' ? null : $encabezado,
         );
     }
 
@@ -310,8 +313,7 @@ class TextoDeDocumento
                 continue;
             }
 
-            // Las etiquetas de karaoke y de voz que a veces traen los .vtt.
-            $texto[] = trim(strip_tags($limpia));
+            $texto[] = trim($this->sinEtiquetasDeSubtitulo($limpia));
         }
 
         $junto = trim(implode(' ', $texto));
@@ -321,6 +323,25 @@ class TextoDeDocumento
         }
 
         return ['inicio' => $tiempos[0], 'fin' => $tiempos[1], 'texto' => $junto];
+    }
+
+    /**
+     * Saca las etiquetas de subtítulo, y sólo ésas.
+     *
+     * Antes usaba `strip_tags()`, que borra cualquier cosa entre `<` y `>`. Lo
+     * encontró la prueba de ida y vuelta: un texto que dijera "<inaudible>"
+     * volvía vacío de ese pedazo, sin que nada lo avisara. En una transcripción
+     * de una charla, marcar así lo que no se entendió es de lo más normal.
+     *
+     * Se listan las que .srt y .vtt de verdad definen —negrita, cursiva, voz,
+     * clase, idioma, ruby— más la etiqueta de tiempo de karaoke de .vtt.
+     */
+    private function sinEtiquetasDeSubtitulo(string $linea): string
+    {
+        $etiquetas = '/<\/?(?:v|c|b|i|u|ruby|rt|lang|font)(?:[\s.][^>]*)?>'
+            .'|<\d{1,2}:\d{2}:\d{2}[.,]\d{1,3}>/iu';
+
+        return (string) preg_replace($etiquetas, '', $linea);
     }
 
     /**

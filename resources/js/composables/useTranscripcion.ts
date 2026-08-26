@@ -12,6 +12,10 @@ export type FichaDeTranscripcion = {
     serie: string;
     serieId: number;
     formato: string;
+    /** Lo que va antes de la primera marca; se reescribe al corregir. */
+    encabezado: string | null;
+    /** Si hay texto que corregir. Un .doc viejo o un .pdf no lo tienen. */
+    seEdita: boolean;
     palabras: number;
     texto: string | null;
     /** Sólo en .srt y .vtt. Hoy no se usan: son para el resaltado que viene. */
