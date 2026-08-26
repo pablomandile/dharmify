@@ -87,8 +87,21 @@ sonando, o a pantalla completa. Lo que se sube a mano **va también a OneDrive**
 a la carpeta del audio: es la única escritura que la app hace sobre tus
 archivos, y no se da por buena hasta preguntarle a la nube si el archivo llegó.
 
-Un `.srt` trae marcas de tiempo, y se guardan aunque todavía no se usen: el día
-que el texto se resalte al ritmo del audio, no habrá que reimportar nada.
+### Las marcas de tiempo ya estaban ahí
+
+Se aceptó `.srt` pensando en poder resaltar el texto al ritmo del audio algún
+día. Al mirar el texto extraído de documentos reales apareció que no hacía falta:
+
+```
+(0:03 - 4:39)
+Buenas tardes, ahora empezamos la primera de las cuatro sesiones…
+```
+
+Estas transcripciones salieron de un pasador automático que deja el rango de
+cada tramo en su propio párrafo, y **584 de las 643 los traen**. Así que los
+tiempos se separan del texto y se guardan como marcas: para todo lo demás, un
+`.docx` marcado y un `.srt` son la misma cosa. El día del resaltado no habrá que
+reimportar nada.
 
 ## Sonar sin cortarse
 
@@ -177,7 +190,7 @@ resources/js/
   composables/         useReproductor (el <audio> único) y useOffline (la caché)
   components/FilaDePista.vue   Una enseñanza y sus botones, en un solo lugar
 public/sw.js         Service worker: audio offline con seek, y rescate de Inertia
-  TextoDeDocumento     Saca el texto de un .docx (ZIP+XML), un .srt o un .txt
+  TextoDeDocumento     Texto y tiempos de un .docx (ZIP+XML), un .srt o un .txt
 tests/js/            Vitest, con dobles de Cache Storage y del <audio>
 ```
 
