@@ -196,6 +196,69 @@ describe('guardar', () => {
     });
 });
 
+describe('lo que viaja junto al audio', () => {
+    /**
+     * Son 8 KB contra 60 MB: al lado de lo que ya se está bajando es gratis, y
+     * es justo el escenario —escuchar en el colectivo— para el que se bajó el
+     * audio. Sin esto, el panel de lectura no abre sin conexión.
+     */
+    it('guarda también la transcripción', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async (url: RequestInfo | URL) =>
+                String(url).includes('transcripcion')
+                    ? Response.json({ pista: 7, texto: 'Buenas tardes.' })
+                    : respuestaDeAudio(),
+            ),
+        );
+
+        const { guardar } = await cargar();
+        await guardar(7);
+
+        const cache = await caches.open(CACHE);
+
+        expect(await cache.match('/pistas/7/transcripcion.json')).toBeDefined();
+    });
+
+    /** Que no haya transcripción no puede dar por fallada la descarga. */
+    it('sin transcripción, el audio se guarda igual', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async (url: RequestInfo | URL) =>
+                String(url).includes('transcripcion')
+                    ? new Response(null, { status: 404 })
+                    : respuestaDeAudio(),
+            ),
+        );
+
+        const { guardar, guardadas } = await cargar();
+        await guardar(7);
+
+        expect(guardadas.value.has(7)).toBe(true);
+    });
+
+    it('quitar del dispositivo se lleva también la transcripción', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async (url: RequestInfo | URL) =>
+                String(url).includes('transcripcion')
+                    ? Response.json({ pista: 7, texto: 'Buenas tardes.' })
+                    : respuestaDeAudio(),
+            ),
+        );
+
+        const { guardar, borrar } = await cargar();
+        await guardar(7);
+        await borrar(7);
+
+        const cache = await caches.open(CACHE);
+
+        expect(
+            await cache.match('/pistas/7/transcripcion.json'),
+        ).toBeUndefined();
+    });
+});
+
 describe('la limpieza de lo que quedó mal guardado', () => {
     beforeEach(() => {
         vi.stubGlobal(
