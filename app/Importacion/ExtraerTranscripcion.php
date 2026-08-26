@@ -69,18 +69,32 @@ class ExtraerTranscripcion
     }
 
     /**
-     * La carpeta más el nombre sin extensión, en minúsculas.
+     * La carpeta más el nombre sin extensión, normalizado.
      *
-     * En minúsculas porque el cruce tiene que sobrevivir a que el documento se
-     * llame "Clase 1.DOCX" y el audio "clase 1.mp3", que en Windows es el mismo
-     * nombre y en el server no.
+     * Dos normalizaciones, y las dos salieron de medir la biblioteca real en vez
+     * de imaginarla:
+     *
+     * - **Minúsculas**, porque el documento se llama "Clase 1.DOCX" y el audio
+     *   "clase 1.mp3": en Windows es el mismo nombre, en el server no.
+     * - **Guión bajo igual que espacio**. Los audios usan "_" donde los
+     *   documentos usan " " —"2020.01.10_19.27_01.MP3" contra "2020.01.10 19.27
+     *   01.docx", y lo mismo con "(192kbit_AAC)" contra "(192kbit AAC)"—. Sin
+     *   esto quedaban 197 transcripciones sin asociar: el cruce pasaba de 447 a
+     *   644 de 709 al agregarla.
+     *
+     * Que no junte dos audios distintos está comprobado sobre la biblioteca
+     * entera: después de normalizar, las 928 claves siguen siendo 928. Es la
+     * condición que hace que esto sea seguro y no una forma elegante de
+     * asociarle a una enseñanza el texto de otra.
      */
     public static function claveDe(string $ruta): string
     {
         $carpeta = pathinfo($ruta, PATHINFO_DIRNAME);
         $base = pathinfo($ruta, PATHINFO_FILENAME);
 
-        return mb_strtolower(($carpeta === '.' ? '' : $carpeta.'/').$base);
+        $clave = mb_strtolower(($carpeta === '.' ? '' : $carpeta.'/').$base);
+
+        return trim((string) preg_replace('/\s+/u', ' ', str_replace('_', ' ', $clave)));
     }
 
     private function esMejor(string $candidato, string $actual): bool

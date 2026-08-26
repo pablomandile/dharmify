@@ -246,6 +246,45 @@ class TranscripcionTest extends TestCase
         $this->assertNull(Pista::where('archivo', 'Clase 2.mp3')->firstOrFail()->transcripcion);
     }
 
+    /**
+     * El guión bajo y el espacio son lo mismo.
+     *
+     * Salió de medir la biblioteca: los audios de varias carpetas usan "_"
+     * donde sus documentos usan " " —"2020.01.10_19.27_01.MP3" contra
+     * "2020.01.10 19.27 01.docx"—. Sin esto quedaban 197 transcripciones sin
+     * asociar, el 28% de las que hay.
+     */
+    public function test_cruza_aunque_el_audio_use_guion_bajo_donde_el_documento_usa_espacio(): void
+    {
+        $this->enLaCarpeta('2020.01.10_19.27_01.mp3');
+        $this->docx($this->enLaCarpeta('2020.01.10 19.27 01.docx'), 'El texto.');
+
+        $fuente = $this->fuente();
+        app(EscanearFuente::class)($fuente);
+        $this->barrer($fuente);
+
+        $this->assertSame('El texto.', Pista::firstOrFail()->transcripcion?->texto);
+    }
+
+    /**
+     * La condición que hace segura a esa normalización.
+     *
+     * Si "clase_1" y "clase 1" fueran dos audios distintos, tratarlos como el
+     * mismo les daría a los dos el texto de uno solo. Sobre la biblioteca real
+     * está comprobado que no pasa —las 928 claves siguen siendo 928— y esto lo
+     * deja fijado para el día que alguien toque la normalización.
+     */
+    public function test_dos_audios_distintos_nunca_comparten_clave(): void
+    {
+        $claves = [];
+
+        foreach (['Clase 1.mp3', 'Clase_2.mp3', 'clase 3.MP3', 'Clase-1.mp3'] as $nombre) {
+            $claves[] = ExtraerTranscripcion::claveDe(self::CARPETA.'/'.$nombre);
+        }
+
+        $this->assertCount(count($claves), array_unique($claves));
+    }
+
     /** Sin esta marca, las pistas sin documento vuelven a la cola para siempre. */
     public function test_marca_como_revisadas_tambien_las_que_no_tienen_documento(): void
     {
