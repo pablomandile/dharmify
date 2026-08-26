@@ -7,6 +7,7 @@ use App\Http\Controllers\FavoritoController;
 use App\Http\Controllers\InicioController;
 use App\Http\Controllers\ListaController;
 use App\Http\Controllers\PistaController;
+use App\Http\Controllers\TranscripcionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -91,6 +92,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
      * que completa las pocas pistas cuyo encabezado no alcanzó para calcularla.
      */
     Route::post('pistas/{pista}/duracion', [PistaController::class, 'duracion'])->name('pistas.duracion');
+
+    /*
+     * El texto de la enseñanza, para leerlo mientras suena.
+     *
+     * La de `.json` va primero y NO bajo /api/: el service worker tiene
+     * prohibido cachear /api/ —una respuesta vieja ahí sería una mentira— y
+     * ésta sí tiene que poder guardarse junto al audio para el colectivo.
+     */
+    Route::get('pistas/{pista}/transcripcion.json', [TranscripcionController::class, 'json'])
+        ->name('pistas.transcripcion.json');
+
+    Route::get('pistas/{pista}/transcripcion', [TranscripcionController::class, 'mostrar'])
+        ->name('pistas.transcripcion');
+
+    Route::get('pistas/{pista}/transcripcion/bajar', [TranscripcionController::class, 'bajar'])
+        ->name('pistas.transcripcion.bajar');
+
+    // Sólo los PDF, que el navegador dibuja solo en un iframe.
+    Route::get('pistas/{pista}/transcripcion/ver', [TranscripcionController::class, 'ver'])
+        ->name('pistas.transcripcion.ver');
+
+    /*
+     * Subir una transcripción. Sólo el administrador, y no sólo porque sea el
+     * catálogo compartido: esto ESCRIBE en OneDrive, que es la única copia que
+     * importa de toda la biblioteca.
+     */
+    Route::post('pistas/{pista}/transcripcion', [TranscripcionController::class, 'subir'])
+        ->middleware('admin')
+        ->name('pistas.transcripcion.subir');
 
     /*
      * El estado va bajo /api porque el service worker tiene prohibido cachear

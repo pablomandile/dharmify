@@ -157,6 +157,22 @@ self.addEventListener('fetch', (event) => {
     if (/^\/pistas\/\d+\/bajar$/.test(url.pathname)) return;
 
     /*
+     * La transcripción de lo bajado, para poder leerla en el colectivo.
+     *
+     * Primero la caché: es texto y no cambia salvo que alguien suba otra
+     * versión, y no vale la pena esperar a la red para mostrar algo que ya está.
+     * Fijate que NO va bajo /api/, que unas líneas más arriba tiene prohibido
+     * cachearse: por eso esta URL termina en .json y no cuelga de ahí.
+     */
+    if (/^\/pistas\/\d+\/transcripcion\.json$/.test(url.pathname)) {
+        event.respondWith(
+            caches.match(request).then((cacheada) => cacheada || fetch(request)),
+        );
+
+        return;
+    }
+
+    /*
      * Las carátulas de lo bajado se guardan junto al audio, así la pantalla de
      * Descargas se ve igual sin conexión.
      *

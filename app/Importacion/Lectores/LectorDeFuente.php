@@ -63,6 +63,29 @@ interface LectorDeFuente
      */
     public function traer(string $raiz, string $ruta, string $destino): bool;
 
+    /**
+     * Manda un archivo del server a la fuente.
+     *
+     * Es el camino inverso de `traer()` y la única escritura que hace la app:
+     * hasta que existió, sólo listaba y leía. Lo justifica la regla número uno
+     * del proyecto —la nube es la única copia que importa, el server es
+     * descartable—: una transcripción que alguien sube y que viviera sólo acá
+     * abajo se perdería en la próxima purga sin que nadie se entere.
+     *
+     * Nunca borra nada. Si en la fuente ya hay un archivo con ese nombre, lo
+     * reemplaza, que es lo que se espera al subir una versión corregida.
+     */
+    public function subir(string $raiz, string $ruta, string $origen): bool;
+
+    /**
+     * Si un archivo está en la fuente.
+     *
+     * Existe para confirmar una subida, y por eso pregunta de verdad en vez de
+     * confiar en que el comando anterior devolvió cero: subir y dar por hecho
+     * que llegó es cómo se pierden archivos en silencio.
+     */
+    public function existe(string $raiz, string $ruta): bool;
+
     /** Para avisar con claridad cuando la fuente no existe o no se puede leer. */
     public function verificar(string $raiz): ?string;
 }

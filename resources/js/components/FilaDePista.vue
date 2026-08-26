@@ -4,6 +4,7 @@ import {
     Check,
     Cloud,
     Download,
+    FileText,
     HardDrive,
     Heart,
     ListPlus,
@@ -24,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useOffline } from '@/composables/useOffline';
 import { useReproductor } from '@/composables/useReproductor';
+import { useTranscripcion } from '@/composables/useTranscripcion';
 import type { FichaDePista, ListaBreve } from '@/types/biblioteca';
 
 /**
@@ -50,6 +52,9 @@ const props = defineProps<{
 const page = usePage();
 const listas = computed(() => (page.props.listas ?? []) as ListaBreve[]);
 
+// Para que el administrador pueda subir una transcripción donde todavía no hay.
+const esAdmin = computed(() => Boolean(page.props.auth?.esAdmin));
+
 // Renombrada: la prop `cola` es lo que ESTA pantalla quiere que suene después,
 // y `colaDelReproductor` es lo que el reproductor tiene cargado ahora. Tenerlas
 // con el mismo nombre en el mismo archivo es pedir confundirlas.
@@ -63,6 +68,7 @@ const {
     alternar,
 } = useReproductor();
 const { guardadas, progreso, guardar, borrar } = useOffline();
+const { abrir: abrirTranscripcion } = useTranscripcion();
 
 const paraReproducir = (p: FichaDePista) => ({
     id: p.id,
@@ -332,6 +338,29 @@ const crearYAgregar = () => {
             >
                 <Check v-if="guardadas.has(pista.id)" class="size-4" />
                 <Smartphone v-else class="size-4" />
+            </button>
+
+            <button
+                v-if="pista.transcripcion || esAdmin"
+                class="rounded-md p-2 hover:bg-accent hover:text-foreground"
+                :class="
+                    pista.transcripcion
+                        ? 'text-muted-foreground'
+                        : 'text-muted-foreground/40'
+                "
+                :title="
+                    pista.transcripcion
+                        ? 'Leer la transcripción'
+                        : 'Todavía no tiene transcripción — tocá para subir una'
+                "
+                :aria-label="
+                    pista.transcripcion
+                        ? 'Leer la transcripción'
+                        : 'Subir una transcripción'
+                "
+                @click="abrirTranscripcion(pista.id, pista.titulo)"
+            >
+                <FileText class="size-4" />
             </button>
 
             <a

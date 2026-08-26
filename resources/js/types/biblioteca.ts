@@ -17,6 +17,8 @@ export type FichaDePista = {
     grabada_el: string | null;
     en_server: boolean;
     en_nube: boolean;
+    /** Si hay texto para leer. El texto en sí se pide aparte, al abrirlo. */
+    transcripcion: boolean;
     favorita: boolean;
 };
 

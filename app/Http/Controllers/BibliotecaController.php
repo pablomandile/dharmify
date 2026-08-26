@@ -137,6 +137,12 @@ class BibliotecaController extends Controller
                 'maestros' => $serie->maestros->map(fn (Maestro $m) => ['nombre' => $m->nombre, 'slug' => $m->slug]),
             ],
             'pistas' => $serie->pistas()
+                /*
+                 * Sin esto, `Pista::ficha()` pregunta si hay transcripción una
+                 * vez por fila: en un retiro de cincuenta audios son cincuenta
+                 * consultas de más. Va en las cuatro pantallas que arman fichas.
+                 */
+                ->withExists('transcripcion')
                 ->orderBy('orden')
                 ->get()
                 ->map(fn (Pista $p) => $p->ficha($favoritas->contains($p->id))),

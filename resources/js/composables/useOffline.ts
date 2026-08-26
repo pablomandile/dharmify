@@ -35,6 +35,12 @@ const urlAudio = (id: number) => `/pistas/${id}/audio`;
  */
 const urlFicha = (id: number) => `/descargas/ficha/${id}.json`;
 
+/*
+ * La transcripción, que sí es una URL de verdad: la pide el panel de lectura, y
+ * el service worker la sirve de acá cuando está guardada.
+ */
+const urlTranscripcion = (id: number) => `/pistas/${id}/transcripcion.json`;
+
 const idDeUrl = (url: string) => {
     const m = url.match(/\/pistas\/(\d+)\/audio/);
 
@@ -427,6 +433,8 @@ const guardar = async (id: number, ficha?: Omit<FichaGuardada, 'id'>) => {
             await guardarLaPortada(cache, ficha.portada);
         }
 
+        await guardarLaTranscripcion(cache, id);
+
         guardadas.value = new Set([...guardadas.value, id]);
         delete progreso[id];
     } catch (e) {
@@ -466,9 +474,34 @@ const guardarLaPortada = async (cache: Cache, portada: string | null) => {
     }
 };
 
+/**
+ * El texto de la enseñanza, junto al audio.
+ *
+ * Son unos 8 KB contra 60 MB: al lado de lo que ya se está bajando es gratis, y
+ * es justo el escenario —escuchar en el colectivo— para el que se bajó el audio.
+ * Que no haya transcripción no es motivo para dar por fallada la descarga.
+ */
+const guardarLaTranscripcion = async (cache: Cache, id: number) => {
+    try {
+        const res = await fetch(urlTranscripcion(id), {
+            headers: { Accept: 'application/json' },
+        });
+
+        if (res.ok) {
+            await cache.put(urlTranscripcion(id), res);
+        }
+    } catch {
+        // Sin conexión no hay nada que guardar, y no es un error.
+    }
+};
+
 const borrar = async (id: number) => {
     const cache = await caches.open(CACHE_AUDIO);
-    await Promise.all([cache.delete(urlAudio(id)), cache.delete(urlFicha(id))]);
+    await Promise.all([
+        cache.delete(urlAudio(id)),
+        cache.delete(urlFicha(id)),
+        cache.delete(urlTranscripcion(id)),
+    ]);
 
     const copia = new Set(guardadas.value);
     copia.delete(id);

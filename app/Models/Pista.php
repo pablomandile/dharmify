@@ -6,6 +6,8 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Una enseñanza.
@@ -23,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $bytes
  * @property int|null $duracion_seg
  * @property CarbonImmutable|null $duracion_revisada_en
+ * @property CarbonImmutable|null $transcripcion_revisada_en
  * @property int $orden
  * @property CarbonImmutable|null $grabada_el
  * @property bool $en_server
@@ -43,6 +46,7 @@ class Pista extends Model
             'bytes' => 'integer',
             'duracion_seg' => 'integer',
             'duracion_revisada_en' => 'datetime',
+            'transcripcion_revisada_en' => 'datetime',
             'orden' => 'integer',
             'grabada_el' => 'date',
             'en_server' => 'boolean',
@@ -81,6 +85,29 @@ class Pista extends Model
     }
 
     /**
+     * Dónde queda guardado el documento original de la transcripción.
+     *
+     * Por `clave` y no por nombre, igual que el audio y por el mismo motivo: en
+     * la biblioteca hay 157 nombres de archivo repetidos.
+     */
+    public function rutaDeLaTranscripcion(string $formato): string
+    {
+        /*
+         * Por el disco y no por `storage_path()` como hace el audio: el
+         * documento se ESCRIBE con `Storage::disk('local')`, y preguntar por
+         * dónde quedó usando otro camino es cómo se termina leyendo de un lugar
+         * distinto del que se escribió.
+         */
+        return Storage::disk('local')->path('transcripciones/'.$this->clave.'.'.$formato);
+    }
+
+    /** @return HasOne<Transcripcion, $this> */
+    public function transcripcion(): HasOne
+    {
+        return $this->hasOne(Transcripcion::class);
+    }
+
+    /**
      * La ficha que consumen todas las pantallas que muestran pistas.
      *
      * Vive acá y no en cada controlador porque son cuatro —la serie, los
@@ -103,6 +130,15 @@ class Pista extends Model
             'grabada_el' => $this->grabada_el?->format('d/m/Y'),
             'en_server' => $this->estaEnElServer(),
             'en_nube' => $this->en_nube,
+            /*
+             * Sólo si hay transcripción; el texto NO viaja acá.
+             *
+             * Se lee de `withExists('transcripcion')` cuando la consulta lo
+             * pidió, y si no se cae a preguntar por la relación. Ese respaldo
+             * evita el N+1 silencioso: una pantalla que se olvide de agregarlo
+             * sigue funcionando bien, sólo que con una consulta por fila.
+             */
+            'transcripcion' => $this->transcripcion_exists ?? $this->transcripcion()->exists(),
             'favorita' => $favorita,
         ];
     }

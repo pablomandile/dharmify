@@ -179,6 +179,43 @@ class LectorRclone implements LectorDeFuente
         return $proceso->isSuccessful() && is_file($destino);
     }
 
+    public function subir(string $raiz, string $ruta, string $origen): bool
+    {
+        if (! is_file($origen) || ! $this->binario()) {
+            return false;
+        }
+
+        // `copyto` otra vez: el nombre en el destino lo decidimos nosotros y no
+        // tiene por qué ser el del archivo temporal que subió el navegador.
+        $proceso = new Process(
+            [$this->binario(), 'copyto', $origen, rtrim($raiz, '/').'/'.$ruta, '--no-traverse'],
+            timeout: 600,
+        );
+        $proceso->run();
+
+        return $proceso->isSuccessful();
+    }
+
+    public function existe(string $raiz, string $ruta): bool
+    {
+        if (! $this->binario()) {
+            return false;
+        }
+
+        /*
+         * `lsjson` sobre el archivo en concreto. Cuando no está, rclone falla
+         * con "directory not found" y sale distinto de cero — que es justo lo
+         * que hace de esto una verificación de verdad y no un sello de goma.
+         */
+        $proceso = new Process(
+            [$this->binario(), 'lsjson', rtrim($raiz, '/').'/'.$ruta],
+            timeout: 120,
+        );
+        $proceso->run();
+
+        return $proceso->isSuccessful() && trim($proceso->getOutput()) !== '[]';
+    }
+
     /**
      * Primero el binario del proyecto y después el del PATH: así el mismo código
      * anda en Windows y en el hosting, donde rclone es un archivo suelto que se

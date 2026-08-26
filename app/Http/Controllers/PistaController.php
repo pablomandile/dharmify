@@ -123,6 +123,7 @@ class PistaController extends Controller
 
         $pistas = Pista::query()
             ->with('serie:id,titulo,fuente_id,portada,portada_revisada_en')
+            ->withExists('transcripcion')
             ->whereIn('id', $ids)
             ->get()
             ->filter(fn (Pista $p) => $visibles->contains($p->serie->fuente_id))

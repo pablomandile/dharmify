@@ -43,6 +43,7 @@ class ListaController extends Controller
 
         $pistas = $suya->pistas()
             ->with('serie:id,titulo,fuente_id,portada,portada_revisada_en')
+            ->withExists('transcripcion')
             ->get()
             ->filter(fn (Pista $p) => $visibles->contains($p->serie->fuente_id))
             ->map(fn (Pista $p) => $p->ficha($favoritas->contains($p->id)))

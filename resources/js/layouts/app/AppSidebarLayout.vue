@@ -4,6 +4,7 @@ import AppContent from '@/components/AppContent.vue';
 import AppShell from '@/components/AppShell.vue';
 import AppSidebar from '@/components/AppSidebar.vue';
 import AppSidebarHeader from '@/components/AppSidebarHeader.vue';
+import PanelDeTranscripcion from '@/components/PanelDeTranscripcion.vue';
 import Reproductor from '@/components/Reproductor.vue';
 import { Toaster } from '@/components/ui/sonner';
 import { useOffline } from '@/composables/useOffline';
@@ -47,6 +48,12 @@ onMounted(revisar);
             biblioteca.
         -->
         <Reproductor />
+
+        <!--
+            El panel de lectura, también en el layout: se abre encima de
+            cualquier pantalla y el audio sigue sonando abajo mientras se lee.
+        -->
+        <PanelDeTranscripcion />
         <Toaster />
     </AppShell>
 </template>

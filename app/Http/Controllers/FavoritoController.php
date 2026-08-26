@@ -23,6 +23,7 @@ class FavoritoController extends Controller
         $pistas = $request->user()
             ->favoritos()
             ->with('serie:id,titulo,fuente_id,portada,portada_revisada_en')
+            ->withExists('transcripcion')
             ->get()
             /*
              * El filtro por visibilidad va también acá y no sólo al marcar: si

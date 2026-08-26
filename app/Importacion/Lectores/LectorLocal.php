@@ -80,6 +80,24 @@ class LectorLocal implements LectorDeFuente
         return copy($origen, $destino);
     }
 
+    public function subir(string $raiz, string $ruta, string $origen): bool
+    {
+        if (! is_file($origen)) {
+            return false;
+        }
+
+        $destino = rtrim(str_replace('\\', '/', $raiz), '/').'/'.$ruta;
+
+        @mkdir(dirname($destino), 0775, true);
+
+        return copy($origen, $destino);
+    }
+
+    public function existe(string $raiz, string $ruta): bool
+    {
+        return is_file(rtrim(str_replace('\\', '/', $raiz), '/').'/'.$ruta);
+    }
+
     public function listar(string $raiz, ?array $extensiones = null): iterable
     {
         $buscadas = $extensiones ?? self::AUDIO;
