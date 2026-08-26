@@ -174,7 +174,7 @@ class TranscripcionTest extends TestCase
     }
 
     /**
-     * El hallazgo que no estaba en el plan: 584 de las 643 transcripciones de
+     * El hallazgo que no estaba en el plan: 580 de las 644 transcripciones de
      * la biblioteca ya traen sus tiempos adentro, en párrafos "(0:03 - 4:39)".
      *
      * O sea que resaltar el texto al ritmo del audio no depende de convertir

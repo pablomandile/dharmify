@@ -98,7 +98,7 @@ Buenas tardes, ahora empezamos la primera de las cuatro sesiones…
 ```
 
 Estas transcripciones salieron de un pasador automático que deja el rango de
-cada tramo en su propio párrafo, y **584 de las 643 los traen**. Así que los
+cada tramo en su propio párrafo, y **580 de las 644 los traen**. Así que los
 tiempos se separan del texto y se guardan como marcas: para todo lo demás, un
 `.docx` marcado y un `.srt` son la misma cosa. El día del resaltado no habrá que
 reimportar nada.

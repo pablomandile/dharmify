@@ -41,8 +41,8 @@ class TextoDeDocumento
      * Un párrafo que es sólo una señal de tiempo: "(0:03 - 4:39)".
      *
      * Estas transcripciones salieron de un pasador automático que deja el rango
-     * de cada tramo en su propio párrafo. Medido sobre la biblioteca real: 584
-     * de 643 los traen. Es lo que hace que resaltar el texto al ritmo del audio
+     * de cada tramo en su propio párrafo. Medido sobre la biblioteca real: 580
+     * de 644 los traen. Es lo que hace que resaltar el texto al ritmo del audio
      * no dependa de convertir nada a .srt.
      */
     private const SENAL_EN_PARRAFO = '/^\(\s*(\d{1,2}:\d{2}(?::\d{2})?)\s*[-\x{2013}\x{2014}]\s*(\d{1,2}:\d{2}(?::\d{2})?)\s*\)$/u';
@@ -163,8 +163,8 @@ class TextoDeDocumento
      * Para todo lo que está más arriba, un .docx marcado y un .srt son la misma
      * cosa, y por eso el panel ya sabe dibujarlos sin cambiar una línea.
      *
-     * Si el documento no está marcado, devuelve el texto tal cual: de las 643
-     * de la biblioteca, 59 son transcripciones escritas a mano y no lo están.
+     * Si el documento no está marcado, devuelve el texto tal cual: de las 644
+     * de la biblioteca, 64 son transcripciones escritas a mano y no lo están.
      *
      * @param  list<string>  $parrafos
      */
