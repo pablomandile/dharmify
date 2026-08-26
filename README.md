@@ -36,13 +36,14 @@ Tres reglas que salen de eso y que atraviesan todo el código:
 Todo lo que la biblioteca sabe de un audio sale de **los primeros 1,5 MB** del
 archivo, que es donde viven las etiquetas. Nunca se descarga un mp3 para leerlo.
 
-Cuatro cosas se sacan de ahí, cada una con su comando reanudable:
+Lo que se saca de ahí, cada cosa con su comando reanudable:
 
 ```bash
 php artisan dharma:portadas            # la carátula: el flyer de la carpeta o la imagen embebida
 php artisan dharma:portadas-genericas  # dibuja una para las series que no tienen ninguna
 php artisan dharma:duraciones          # la duración real de cada pista
 php artisan dharma:titulos             # el título, desde la etiqueta de álbum (mostrar / --aplicar)
+php artisan dharma:transcripciones     # el texto, desde el documento que está al lado (mostrar / --aplicar)
 php artisan dharma:iconos              # el favicon y los íconos de la PWA, desde el logo
 ```
 
@@ -67,6 +68,27 @@ embebida ocupa 748 KB y el audio recién empieza en el byte 758.794.
 **Tres lecturas simultáneas, no cuatro.** rclone está escrito en Go y pide hilos
 del sistema; el hosting los limita para la cuenta entera. Con cuatro en paralelo
 muere con `failed to create new OS thread` y devuelve encabezados vacíos.
+
+## Leer mientras suena
+
+Muchas de estas enseñanzas están transcriptas, y esas transcripciones ya vivían
+en OneDrive: **709 documentos** al lado de los mp3 y con el mismo nombre base.
+Así que no hay que subirlas — se importan igual que los flyers de las carátulas.
+
+Ningún navegador sabe mostrar un `.docx`, y 692 de los 709 lo son, así que el
+texto se saca en el servidor. Un `.docx` es un ZIP con un XML adentro y las dos
+extensiones que hacen falta ya están en el hosting: **ninguna dependencia
+nueva**, que es lo que importa donde no se puede instalar nada. Y el texto sale
+ganando: se lee en el teléfono, pesa 8 KB en vez de 19 y viaja con el audio a la
+caché del dispositivo, que es el único modo de leerlo en el colectivo.
+
+Se lee en un panel al costado, sin salir de donde estabas y con el audio
+sonando, o a pantalla completa. Lo que se sube a mano **va también a OneDrive**,
+a la carpeta del audio: es la única escritura que la app hace sobre tus
+archivos, y no se da por buena hasta preguntarle a la nube si el archivo llegó.
+
+Un `.srt` trae marcas de tiempo, y se guardan aunque todavía no se usen: el día
+que el texto se resalte al ritmo del audio, no habrá que reimportar nada.
 
 ## Sonar sin cortarse
 
@@ -155,6 +177,7 @@ resources/js/
   composables/         useReproductor (el <audio> único) y useOffline (la caché)
   components/FilaDePista.vue   Una enseñanza y sus botones, en un solo lugar
 public/sw.js         Service worker: audio offline con seek, y rescate de Inertia
+  TextoDeDocumento     Saca el texto de un .docx (ZIP+XML), un .srt o un .txt
 tests/js/            Vitest, con dobles de Cache Storage y del <audio>
 ```
 
