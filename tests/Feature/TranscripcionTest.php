@@ -173,6 +173,62 @@ class TranscripcionTest extends TestCase
         );
     }
 
+    /**
+     * El hallazgo que no estaba en el plan: 584 de las 643 transcripciones de
+     * la biblioteca ya traen sus tiempos adentro, en párrafos "(0:03 - 4:39)".
+     *
+     * O sea que resaltar el texto al ritmo del audio no depende de convertir
+     * nada a .srt: los tiempos ya estaban. Se separan del texto —leerlos de
+     * corrido es ruido— y quedan como marcas, así que para todo lo de arriba un
+     * .docx marcado y un .srt son la misma cosa.
+     */
+    public function test_saca_las_marcas_de_tiempo_que_el_docx_trae_adentro(): void
+    {
+        $ruta = $this->docx(
+            $this->raiz.'/marcado.docx',
+            '02 Celebracion del Dharma Argentina 2015',
+            '(0:03 - 4:39)', 'Buenas tardes, ahora empezamos.',
+            '(4:40 - 8:12)', 'Y la función del comentario.',
+            '(8:13 - 12:00)', 'Sentémonos con la espalda recta.',
+            '(1:02:33 - 1:05:00)', 'Ya casi terminamos.',
+        );
+
+        $extraido = app(TextoDeDocumento::class)((string) file_get_contents($ruta), 'clase.docx');
+
+        $this->assertNotNull($extraido);
+        $this->assertCount(4, (array) $extraido->marcas);
+
+        // "0:03" son 3 segundos y "1:02:33" son 3753: las dos formas se leen.
+        $this->assertSame(3.0, $extraido->marcas[0]['inicio']);
+        $this->assertSame(279.0, $extraido->marcas[0]['fin']);
+        $this->assertSame(3753.0, $extraido->marcas[3]['inicio']);
+
+        // Y las señales no quedan en el texto, que es para leer.
+        $this->assertStringNotContainsString('(0:03', $extraido->texto);
+        $this->assertStringContainsString('Buenas tardes, ahora empezamos.', $extraido->texto);
+        $this->assertStringContainsString('Celebracion del Dharma', $extraido->texto);
+    }
+
+    /**
+     * Lo que evita partir una transcripción en un lugar arbitrario: que alguien
+     * mencione un horario de paso no la convierte en un documento marcado.
+     */
+    public function test_una_mencion_suelta_de_un_horario_no_es_una_marca(): void
+    {
+        $ruta = $this->docx(
+            $this->raiz.'/suelto.docx',
+            'Charla escrita a mano.',
+            'Nos vemos a las (3:00 - 4:00) si podés.',
+            'Otro párrafo cualquiera.',
+        );
+
+        $extraido = app(TextoDeDocumento::class)((string) file_get_contents($ruta), 'clase.docx');
+
+        $this->assertNotNull($extraido);
+        $this->assertNull($extraido->marcas);
+        $this->assertStringContainsString('(3:00 - 4:00)', $extraido->texto);
+    }
+
     public function test_un_txt_en_latin1_no_llega_con_los_acentos_rotos(): void
     {
         $bytes = (string) mb_convert_encoding('Meditación y compasión', 'ISO-8859-1', 'UTF-8');

@@ -37,6 +37,25 @@ class TextoDeDocumento
     /** A partir de acá, un punto final es buen lugar para cortar el párrafo. */
     private const PARRAFO_LARGO = 500;
 
+    /**
+     * Un párrafo que es sólo una señal de tiempo: "(0:03 - 4:39)".
+     *
+     * Estas transcripciones salieron de un pasador automático que deja el rango
+     * de cada tramo en su propio párrafo. Medido sobre la biblioteca real: 584
+     * de 643 los traen. Es lo que hace que resaltar el texto al ritmo del audio
+     * no dependa de convertir nada a .srt.
+     */
+    private const SENAL_EN_PARRAFO = '/^\(\s*(\d{1,2}:\d{2}(?::\d{2})?)\s*[-\x{2013}\x{2014}]\s*(\d{1,2}:\d{2}(?::\d{2})?)\s*\)$/u';
+
+    /**
+     * Cuántas señales hacen falta para creer que el documento está marcado.
+     *
+     * Con menos, lo más probable es que sea una mención suelta de un horario en
+     * medio del texto, y tomarla por una marca partiría la transcripción en un
+     * lugar arbitrario.
+     */
+    private const SENALES_MINIMAS = 4;
+
     public function __invoke(string $bytes, string $nombre): ?TextoExtraido
     {
         $formato = mb_strtolower(pathinfo($nombre, PATHINFO_EXTENSION));
@@ -130,10 +149,95 @@ class TextoDeDocumento
 
             return $parrafos === []
                 ? null
-                : new TextoExtraido(implode("\n\n", $parrafos));
+                : $this->conSusSenales($parrafos);
         } finally {
             @unlink($temporal);
         }
+    }
+
+    /**
+     * Separa las señales de tiempo del texto de un documento de Word.
+     *
+     * Las señales salen del texto —leerlas de corrido es ruido— y se guardan
+     * aparte con sus segundos, igual que si el archivo hubiera sido un .srt.
+     * Para todo lo que está más arriba, un .docx marcado y un .srt son la misma
+     * cosa, y por eso el panel ya sabe dibujarlos sin cambiar una línea.
+     *
+     * Si el documento no está marcado, devuelve el texto tal cual: de las 643
+     * de la biblioteca, 59 son transcripciones escritas a mano y no lo están.
+     *
+     * @param  list<string>  $parrafos
+     */
+    private function conSusSenales(array $parrafos): TextoExtraido
+    {
+        /** @var list<array{inicio: float, fin: float, texto: string}> $marcas */
+        $marcas = [];
+        $sueltos = [];
+        $abierta = null;
+        $acumulado = [];
+
+        foreach ($parrafos as $parrafo) {
+            if (preg_match(self::SENAL_EN_PARRAFO, trim($parrafo), $m) === 1) {
+                $marcas = $this->cerrando($marcas, $abierta, $acumulado);
+                $abierta = [$this->deReloj($m[1]), $this->deReloj($m[2])];
+                $acumulado = [];
+
+                continue;
+            }
+
+            if ($abierta === null) {
+                /*
+                 * Lo que viene antes de la primera señal: casi siempre el nombre
+                 * del archivo repetido arriba de todo. Se conserva en el texto
+                 * pero fuera de las marcas, porque no se dice en ningún minuto.
+                 */
+                $sueltos[] = $parrafo;
+
+                continue;
+            }
+
+            $acumulado[] = $parrafo;
+        }
+
+        $marcas = $this->cerrando($marcas, $abierta, $acumulado);
+
+        if (count($marcas) < self::SENALES_MINIMAS) {
+            return new TextoExtraido(implode("\n\n", $parrafos));
+        }
+
+        return new TextoExtraido(
+            implode("\n\n", array_merge($sueltos, array_column($marcas, 'texto'))),
+            $marcas,
+        );
+    }
+
+    /**
+     * Guarda el tramo que se venía juntando, si hay algo que guardar.
+     *
+     * @param  list<array{inicio: float, fin: float, texto: string}>  $marcas
+     * @param  array{0: float, 1: float}|null  $abierta
+     * @param  list<string>  $acumulado
+     * @return list<array{inicio: float, fin: float, texto: string}>
+     */
+    private function cerrando(array $marcas, ?array $abierta, array $acumulado): array
+    {
+        $junto = trim(implode("\n\n", $acumulado));
+
+        if ($abierta !== null && $junto !== '') {
+            $marcas[] = ['inicio' => $abierta[0], 'fin' => $abierta[1], 'texto' => $junto];
+        }
+
+        return $marcas;
+    }
+
+    /** "4:39" o "1:05:00" a segundos. */
+    private function deReloj(string $reloj): float
+    {
+        $partes = array_map('intval', explode(':', $reloj));
+
+        return count($partes) === 3
+            ? $partes[0] * 3600 + $partes[1] * 60 + $partes[2]
+            : $partes[0] * 60 + $partes[1];
     }
 
     /**
