@@ -67,6 +67,30 @@ class IngresoConGoogleTest extends TestCase
     }
 
     /**
+     * Lo que distingue la invitación de un ticket de entrada: revocarla tiene
+     * que cortarle el paso a alguien que TODAVÍA no se dio de alta, no sólo a
+     * quien ya tiene cuenta. Sin esto, dejar de compartir con una dirección que
+     * nunca llegó a entrar seguiría dejándola crearse la cuenta después.
+     */
+    public function test_una_invitacion_revocada_no_deja_entrar_a_alguien_nuevo(): void
+    {
+        Invitacion::create(['email' => 'amiga@example.test', 'revocada_en' => now()]);
+
+        $this->expectException(AccesoNoAutorizado::class);
+
+        $this->servicio()->resolver($this->cuenta('amiga@example.test'));
+    }
+
+    public function test_una_invitacion_vencida_no_deja_entrar_a_alguien_nuevo(): void
+    {
+        Invitacion::create(['email' => 'amiga@example.test', 'expira_en' => now()->subDay()]);
+
+        $this->expectException(AccesoNoAutorizado::class);
+
+        $this->servicio()->resolver($this->cuenta('amiga@example.test'));
+    }
+
+    /**
      * El corazón de todo esto: entrar bien a Google NO da acceso. La biblioteca
      * es privada y sin invitación se rebota, por más impecable que sea la cuenta.
      */

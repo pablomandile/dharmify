@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\FuenteController;
+use App\Http\Controllers\InvitacionController;
 use App\Http\Controllers\RefrescarBibliotecaController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
@@ -44,6 +45,14 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
     Route::post('biblioteca/refrescar', RefrescarBibliotecaController::class)
         ->middleware('throttle:6,5')
         ->name('biblioteca.refrescar');
+
+    // Con quién se comparte la biblioteca. Invitar es compartirla; revocar es
+    // dejar de compartirla, sin tocarle la cuenta a nadie.
+    Route::get('settings/invitaciones', [InvitacionController::class, 'index'])->name('invitaciones.index');
+    Route::post('settings/invitaciones', [InvitacionController::class, 'store'])->name('invitaciones.store');
+    Route::delete('settings/invitaciones/{invitacion}', [InvitacionController::class, 'destroy'])->name('invitaciones.destroy');
+    Route::post('settings/invitaciones/{invitacion}/revocar', [InvitacionController::class, 'revocar'])->name('invitaciones.revocar');
+    Route::post('settings/invitaciones/{invitacion}/restaurar', [InvitacionController::class, 'restaurar'])->name('invitaciones.restaurar');
 });
 
 Route::get('.well-known/passkey-endpoints', function () {

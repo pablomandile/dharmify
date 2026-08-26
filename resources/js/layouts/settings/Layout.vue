@@ -14,9 +14,9 @@ import type { NavItem } from '@/types';
 const page = usePage();
 
 /*
- * "Fuentes" sólo para el administrador. Es cosmético: quien la pida sin serlo
- * recibe un 404 del middleware igual. Acá lo que se evita es ofrecer una puerta
- * cerrada.
+ * "Fuentes" e "Invitaciones", sólo para el administrador. Es cosmético: quien
+ * las pida sin serlo recibe un 404 del middleware igual. Acá lo que se evita es
+ * ofrecer una puerta cerrada.
  */
 const sidebarNavItems = computed<NavItem[]>(() => [
     {
@@ -32,7 +32,10 @@ const sidebarNavItems = computed<NavItem[]>(() => [
         href: editAppearance(),
     },
     ...(page.props.auth?.esAdmin
-        ? [{ title: 'Fuentes', href: '/settings/fuentes' }]
+        ? [
+              { title: 'Fuentes', href: '/settings/fuentes' },
+              { title: 'Invitaciones', href: '/settings/invitaciones' },
+          ]
         : []),
 ]);
 

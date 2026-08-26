@@ -51,6 +51,10 @@ class IngresoConGoogleService
             if ($usuario) {
                 $usuario->google_id = $cuenta->id;
 
+                // Sin esto, quien ya existía por email entra pero su invitación
+                // queda para siempre como "pendiente" en el panel.
+                $this->marcarAceptada($cuenta->email);
+
                 return $this->refrescar($usuario, $cuenta);
             }
 
@@ -74,10 +78,7 @@ class IngresoConGoogleService
             $usuario->email_verified_at = now();
             $usuario->save();
 
-            Invitacion::query()
-                ->where('email', $cuenta->email)
-                ->whereNull('aceptada_en')
-                ->update(['aceptada_en' => now()]);
+            $this->marcarAceptada($cuenta->email);
 
             return $usuario;
         });
@@ -104,12 +105,32 @@ class IngresoConGoogleService
             return User::ROL_ADMIN;
         }
 
-        $invitada = Invitacion::query()->where('email', $email)->exists();
+        /*
+         * `vigentes()` y no un `exists()` pelado: una invitación revocada o
+         * vencida es un permiso que ya no está, y tiene que rebotar igual que
+         * si nunca hubiera existido. Sin esto, dejar de compartir con alguien
+         * seguiría permitiéndole crearse la cuenta.
+         */
+        $invitada = Invitacion::query()->where('email', $email)->vigentes()->exists();
 
         if (! $invitada) {
-            throw new AccesoNoAutorizado("Sin invitación para {$email}.");
+            throw new AccesoNoAutorizado("Sin invitación vigente para {$email}.");
         }
 
         return User::ROL_INVITADO;
+    }
+
+    /**
+     * Deja constancia de cuándo entró por primera vez.
+     *
+     * Sólo la primera: `aceptada_en` responde "desde cuándo usa la biblioteca",
+     * no "cuándo entró la última vez" —eso lo contesta la sesión—.
+     */
+    private function marcarAceptada(string $email): void
+    {
+        Invitacion::query()
+            ->where('email', $email)
+            ->whereNull('aceptada_en')
+            ->update(['aceptada_en' => now()]);
     }
 }

@@ -89,6 +89,13 @@ class BibliotecaController extends Controller
         return Inertia::render('Biblioteca', [
             'series' => $series,
             'filtros' => $filtros,
+            /*
+             * Una grilla vacía es ambigua: puede ser que todavía no haya
+             * ninguna fuente configurada, o que a esta persona le dejaron de
+             * compartir la biblioteca. Sin distinguirlas, quien perdió el
+             * acceso se queda mirando una pantalla vacía sin entender nada.
+             */
+            'sinAcceso' => ! $request->user()?->puedeVerLaBiblioteca(),
             'maestros' => Maestro::query()
                 ->whereHas('series', fn (Builder $q) => $q->whereIn('fuente_id', $this->fuentesVisibles()))
                 ->orderBy('nombre')

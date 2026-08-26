@@ -53,14 +53,14 @@ class User extends Authenticatable implements PasskeyUser
         ];
     }
 
-    public const ROL_ADMIN = 'admin';
-
-    public const ROL_INVITADO = 'invitado';
-
     /**
      * El administrador importa la biblioteca, edita la taxonomía e invita gente.
      * El invitado escucha y arma sus propias listas, nada más.
      */
+    public const ROL_ADMIN = 'admin';
+
+    public const ROL_INVITADO = 'invitado';
+
     /**
      * Las enseñanzas marcadas como favoritas.
      *
@@ -79,8 +79,46 @@ class User extends Authenticatable implements PasskeyUser
         return $this->hasMany(Lista::class)->orderBy('nombre');
     }
 
+    /**
+     * Las invitaciones que esta persona repartió.
+     *
+     * @return HasMany<Invitacion, $this>
+     */
+    public function invitacionesEnviadas(): HasMany
+    {
+        return $this->hasMany(Invitacion::class, 'invitada_por');
+    }
+
     public function esAdmin(): bool
     {
         return $this->rol === self::ROL_ADMIN;
     }
+
+    /**
+     * Si esta persona tiene hoy permiso de ver la biblioteca.
+     *
+     * La invitación no es un ticket que se usa una vez y se tira: es el permiso
+     * mismo, y vale mientras siga vigente. Por eso se pregunta en cada pedido y
+     * no sólo al darse de alta — sin esto, revocar no le sacaría el acceso a
+     * nadie que ya hubiera entrado.
+     *
+     * Se memoiza porque Fuente::visiblesPara() la consulta varias veces por
+     * pedido: la biblioteca, el audio y el desplegable de carpetas del menú
+     * preguntan cada uno por su lado, y la respuesta no puede cambiar en el
+     * medio de un mismo pedido.
+     */
+    public function puedeVerLaBiblioteca(): bool
+    {
+        if ($this->esAdmin()) {
+            return true;
+        }
+
+        return $this->accesoVigente ??= Invitacion::query()
+            ->where('email', $this->email)
+            ->vigentes()
+            ->exists();
+    }
+
+    /** El memo de puedeVerLaBiblioteca(), sólo para lo que dure el pedido. */
+    private ?bool $accesoVigente = null;
 }

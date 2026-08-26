@@ -161,12 +161,18 @@ tests/js/            Vitest, con dobles de Cache Storage y del <audio>
 ## Estado
 
 Andando en producción: reproductor, offline, favoritos, listas, descargas,
-búsqueda y filtros. **145 de 145 series con carátula** (83 propias, 62
-dibujadas), 901 pistas con duración exacta.
+búsqueda y filtros, y el panel de invitaciones. **145 de 145 series con
+carátula** (83 propias, 62 dibujadas), 901 pistas con duración exacta.
 
-Pendiente: retomar donde quedaste, la purga automática del servidor, el panel de
-invitaciones y la biblioteca pública —el modelo ya la soporta, falta apuntarla a
-su carpeta—.
+La invitación no es un alta de una sola vez: es el permiso vigente de ver la
+biblioteca. Revocarla —desde `/settings/invitaciones`— le saca el contenido a
+esa persona en el próximo pedido sin tocarle la cuenta ni sus favoritos ni sus
+listas; volver a compartir se lo devuelve tal cual lo dejó. No manda mail: el
+servidor no tiene un mailer configurado, así que el link se pasa a mano.
+
+Pendiente: retomar donde quedaste, la purga automática del servidor, mandar el
+mail de invitación (necesita SMTP configurado), y la biblioteca pública —el
+modelo ya la soporta, falta apuntarla a su carpeta—.
 
 ---
 

@@ -38,6 +38,8 @@ const props = defineProps<{
     tipos: string[];
     anios: number[];
     totales: { series: number; pistas: number };
+    /** Sin invitación vigente. Ver el estado vacío, más abajo. */
+    sinAcceso: boolean;
 }>();
 
 defineOptions({
@@ -223,7 +225,19 @@ const etiquetaTipo: Record<string, string> = {
             v-if="!series.data.length"
             class="rounded-lg border border-dashed p-10 text-center"
         >
-            <p class="text-sm text-muted-foreground">
+            <!--
+                Los tres casos se ven igual —una grilla sin nada— y significan
+                cosas muy distintas. Sin separarlos, a quien le dejaron de
+                compartir la biblioteca se queda mirando un cartel que le pide
+                configurar una fuente de OneDrive que no es suya.
+            -->
+            <p v-if="sinAcceso" class="text-sm text-muted-foreground">
+                Ya no tenés acceso a esta biblioteca. Tus favoritos y tus listas
+                quedaron guardados: si te la vuelven a compartir, vas a
+                encontrar todo como lo dejaste.
+            </p>
+
+            <p v-else class="text-sm text-muted-foreground">
                 <template v-if="hayFiltros()">
                     No hay nada que coincida con esa búsqueda.
                 </template>

@@ -60,21 +60,38 @@ class Fuente extends Model
      * Los ids de las fuentes que esta persona puede ver.
      *
      * Vive acá y no en cada controlador porque la respuesta tiene que ser la
-     * misma en los cuatro lugares que preguntan —la biblioteca, el audio, las
-     * carátulas y el menú—. Con una copia por controlador, agregar una fuente
-     * nueva significa acordarse de cuatro archivos.
+     * misma en los diez lugares que preguntan —la biblioteca, el audio, las
+     * carátulas, los favoritos, las listas y el desplegable de carpetas del
+     * menú—. Con una copia por controlador, agregar una fuente nueva significa
+     * acordarse de diez archivos.
      *
-     * El administrador ve todo; quien fue invitado, sólo lo público. Es el
-     * sentido de que la fuente tenga visibilidad: hay enseñanzas que no se
-     * comparten.
+     * Eso mismo la convierte en el único lugar donde hace falta implementar
+     * dejar de compartir: si acá no hay fuentes, no hay nada que ver en ningún
+     * lado, ni siquiera pidiendo un audio por su URL. Por eso no hay un
+     * middleware nuevo ni una Policy: el permiso se decide donde el código ya
+     * había decidido centralizar la pregunta.
+     *
+     * El administrador ve todo; quien fue invitado, sólo lo público, y sólo
+     * mientras su invitación siga vigente. Es el sentido de que la fuente tenga
+     * visibilidad: hay enseñanzas que no se comparten.
      *
      * @return Collection<int, int>
      */
     public static function visiblesPara(?User $persona): Collection
     {
+        /*
+         * Sin invitación vigente no se ve NADA, y devolver una colección vacía
+         * es la forma correcta de decirlo: los diez lugares que preguntan ya
+         * saben qué hacer con una lista vacía —grilla vacía, menú vacío, 404 en
+         * el audio—, así que no hay que tocar ninguno.
+         */
+        if (! $persona?->puedeVerLaBiblioteca()) {
+            return new Collection;
+        }
+
         return self::query()
             ->when(
-                ! $persona?->esAdmin(),
+                ! $persona->esAdmin(),
                 fn (Builder $q) => $q->where('visibilidad', self::VISIBILIDAD_PUBLICA),
             )
             ->pluck('id');
