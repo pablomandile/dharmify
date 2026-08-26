@@ -117,9 +117,15 @@ composer dev        # servidor, cola, logs y Vite, todo junto
 composer ci:check   # lo mismo que corre el CI
 ```
 
-`ci:check` es ESLint + Prettier + vue-tsc + Pint + PHPStan + 109 pruebas. Las
-pruebas usan SQLite en memoria; producción es MySQL, y la diferencia se nota en
-al menos un lugar (el cotejo: SQLite ordena "Ángeles" después de la Z).
+`ci:check` es ESLint + Prettier + vue-tsc + Pint + PHPStan + 116 pruebas de PHP
+y 17 de JavaScript. Las de PHP usan SQLite en memoria; producción es MySQL, y la
+diferencia se nota en al menos un lugar (el cotejo: SQLite ordena "Ángeles"
+después de la Z).
+
+Las de JavaScript (Vitest, `npm run test`) cubren lo que desde PHP no se ve: a
+qué copia le da play el reproductor, y qué se deja entrar a la caché del
+dispositivo. Ahí vivieron dos bugs que sólo aparecían en el teléfono, y los dos
+están clavados por una prueba que se validó revirtiendo el arreglo.
 
 ### Desplegar
 
@@ -149,6 +155,7 @@ resources/js/
   composables/         useReproductor (el <audio> único) y useOffline (la caché)
   components/FilaDePista.vue   Una enseñanza y sus botones, en un solo lugar
 public/sw.js         Service worker: audio offline con seek, y rescate de Inertia
+tests/js/            Vitest, con dobles de Cache Storage y del <audio>
 ```
 
 ## Estado
