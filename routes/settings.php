@@ -50,6 +50,7 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
     // dejar de compartirla, sin tocarle la cuenta a nadie.
     Route::get('settings/invitaciones', [InvitacionController::class, 'index'])->name('invitaciones.index');
     Route::post('settings/invitaciones', [InvitacionController::class, 'store'])->name('invitaciones.store');
+    Route::post('settings/invitaciones/link', [InvitacionController::class, 'link'])->name('invitaciones.link');
     Route::delete('settings/invitaciones/{invitacion}', [InvitacionController::class, 'destroy'])->name('invitaciones.destroy');
     Route::post('settings/invitaciones/{invitacion}/revocar', [InvitacionController::class, 'revocar'])->name('invitaciones.revocar');
     Route::post('settings/invitaciones/{invitacion}/restaurar', [InvitacionController::class, 'restaurar'])->name('invitaciones.restaurar');

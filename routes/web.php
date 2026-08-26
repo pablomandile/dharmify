@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\GoogleController;
+use App\Http\Controllers\Auth\InvitacionPorLinkController;
 use App\Http\Controllers\BibliotecaController;
 use App\Http\Controllers\FavoritoController;
 use App\Http\Controllers\InicioController;
@@ -36,6 +37,19 @@ Route::middleware('guest')->group(function () {
     Route::get('auth/google/callback', [GoogleController::class, 'volver'])
         ->name('google.callback');
 });
+
+/*
+ * Un link de invitación. Fuera de `guest` a propósito: a quien ya tiene la
+ * sesión abierta y recibe un link nuevo —porque le habían dejado de compartir
+ * la biblioteca— hay que dejarlo usarlo sin obligarlo a desloguearse.
+ *
+ * `throttle` porque es lo único de la app que se puede probar a ciegas: 40
+ * caracteres al azar no se adivinan, pero tampoco hay motivo para permitir que
+ * alguien lo intente miles de veces.
+ */
+Route::get('invitacion/{token}', InvitacionPorLinkController::class)
+    ->middleware('throttle:10,1')
+    ->name('invitacion.aceptar');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     /*

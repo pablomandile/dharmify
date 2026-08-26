@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
-import { Ban, RotateCcw, Trash2, UserPlus } from '@lucide/vue';
+import {
+    Ban,
+    Check,
+    Copy,
+    Link2,
+    RotateCcw,
+    Trash2,
+    UserPlus,
+} from '@lucide/vue';
 import { computed, ref } from 'vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
@@ -28,8 +36,11 @@ import { Spinner } from '@/components/ui/spinner';
 
 type Invitacion = {
     id: number;
-    email: string;
-    estado: 'pendiente' | 'aceptada' | 'vencida' | 'revocada';
+    /** null mientras es un link que nadie usó todavía. */
+    email: string | null;
+    /** La URL a pasar, sólo en los links sin reclamar. */
+    url: string | null;
+    estado: 'pendiente' | 'aceptada' | 'vencida' | 'revocada' | 'link';
     invitada_el: string | null;
     expira_en: string | null;
     invitada_por: string | null;
@@ -57,12 +68,18 @@ const estado = computed(() => page.props.estado as string | null);
 const error = computed(() => page.props.error as string | null);
 
 /*
- * Quien ya entró y quien todavía no son dos cosas distintas: sobre el primero
- * se decide si sigue viendo la biblioteca, sobre el segundo sólo si la
- * invitación sigue en pie.
+ * Tres grupos, porque son tres cosas distintas: sobre quien ya entró se decide
+ * si sigue viendo la biblioteca; sobre una invitación por email, sólo si sigue
+ * en pie; y un link sin usar todavía no tiene dueño, así que lo único que hay
+ * para hacer con él es copiarlo o darlo de baja.
  */
 const conCuenta = computed(() => props.invitaciones.filter((i) => i.usuario));
-const pendientes = computed(() => props.invitaciones.filter((i) => !i.usuario));
+const links = computed(() =>
+    props.invitaciones.filter((i) => !i.usuario && i.estado === 'link'),
+);
+const pendientes = computed(() =>
+    props.invitaciones.filter((i) => !i.usuario && i.estado !== 'link'),
+);
 
 const comparte = (i: Invitacion) =>
     i.estado === 'pendiente' || i.estado === 'aceptada';
@@ -72,6 +89,7 @@ const etiqueta: Record<Invitacion['estado'], string> = {
     aceptada: 'Con acceso',
     vencida: 'Vencida',
     revocada: 'Sin acceso',
+    link: 'Sin usar',
 };
 
 const abierto = ref(false);
@@ -121,6 +139,42 @@ const restaurar = (i: Invitacion) =>
         { preserveScroll: true },
     );
 
+const crearLink = () =>
+    router.post('/settings/invitaciones/link', {}, { preserveScroll: true });
+
+/*
+ * Cuál se acaba de copiar, para confirmarlo en el botón. Sin esa confirmación
+ * no hay forma de saber si el clic hizo algo: el portapapeles no se ve.
+ */
+const copiado = ref<number | null>(null);
+
+const copiar = async (i: Invitacion) => {
+    if (!i.url) {
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(i.url);
+        copiado.value = i.id;
+        setTimeout(() => (copiado.value = null), 2000);
+    } catch {
+        // Sin permiso al portapapeles queda el link a la vista para copiarlo a
+        // mano, que es justamente por lo que se muestra entero.
+    }
+};
+
+const darDeBaja = (i: Invitacion) => {
+    if (
+        confirm(
+            '¿Dar de baja este link? Si ya se lo pasaste a alguien, deja de servir.',
+        )
+    ) {
+        router.delete(`/settings/invitaciones/${i.id}`, {
+            preserveScroll: true,
+        });
+    }
+};
+
 const cancelar = (i: Invitacion) => {
     if (confirm(`¿Cancelar la invitación de ${i.email}?`)) {
         router.delete(`/settings/invitaciones/${i.id}`, {
@@ -148,10 +202,16 @@ const iniciales = (nombre: string) =>
                 description="Con quién compartís tu biblioteca"
             />
 
-            <Button variant="outline" @click="abierto = true">
-                <UserPlus class="size-4" />
-                Invitar
-            </Button>
+            <div class="flex flex-wrap gap-2">
+                <Button variant="outline" @click="crearLink">
+                    <Link2 class="size-4" />
+                    Crear link
+                </Button>
+                <Button variant="outline" @click="abierto = true">
+                    <UserPlus class="size-4" />
+                    Invitar por email
+                </Button>
+            </div>
         </div>
 
         <div
@@ -173,8 +233,9 @@ const iniciales = (nombre: string) =>
             class="rounded-lg border border-dashed p-8 text-center"
         >
             <p class="text-sm text-muted-foreground">
-                Todavía no invitaste a nadie. Agregá el correo de Google de la
-                persona y pasale el link: entra con ese correo y ya está.
+                Todavía no invitaste a nadie. Si sabés su correo de Google,
+                invitala por email; si no, creá un link y pasáselo. En los dos
+                casos entra con Google y ya está.
             </p>
         </div>
 
@@ -252,6 +313,59 @@ const iniciales = (nombre: string) =>
                         >
                             <RotateCcw class="size-4" />
                             Volver a compartir
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section v-if="links.length" class="space-y-3">
+            <h3 class="text-sm font-medium text-muted-foreground">
+                Links sin usar
+            </h3>
+
+            <div v-for="i in links" :key="i.id" class="rounded-lg border p-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary">
+                                {{ etiqueta[i.estado] }}
+                            </Badge>
+                            <span class="text-xs text-muted-foreground">
+                                sirve una sola vez
+                            </span>
+                        </div>
+
+                        <!--
+                            El link se muestra entero y no detrás de un botón:
+                            si el portapapeles falla o el navegador no da
+                            permiso, tiene que poder copiarse a mano.
+                        -->
+                        <p
+                            class="mt-2 font-mono text-xs break-all text-muted-foreground"
+                        >
+                            {{ i.url }}
+                        </p>
+
+                        <p class="mt-2 text-sm text-muted-foreground">
+                            <template v-if="i.invitada_el">
+                                Creado el {{ i.invitada_el }}
+                            </template>
+                            <template v-if="i.expira_en">
+                                · vence el {{ i.expira_en }}
+                            </template>
+                            <template v-else>· sin vencimiento</template>
+                        </p>
+                    </div>
+
+                    <div class="flex shrink-0 gap-2">
+                        <Button variant="outline" size="sm" @click="copiar(i)">
+                            <Check v-if="copiado === i.id" class="size-4" />
+                            <Copy v-else class="size-4" />
+                            {{ copiado === i.id ? 'Copiado' : 'Copiar' }}
+                        </Button>
+                        <Button variant="ghost" size="sm" @click="darDeBaja(i)">
+                            <Trash2 class="size-4" />
                         </Button>
                     </div>
                 </div>

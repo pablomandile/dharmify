@@ -56,7 +56,16 @@ class GoogleController extends Controller
             // no tiene forma de saber con cuál entró.
             $cuenta = CuentaDeGoogle::desdeSocialite(Socialite::driver('google')->user());
 
-            $usuario = $this->ingreso->resolver($cuenta);
+            /*
+             * El token lo dejó InvitacionPorLinkController antes de mandar a
+             * Google. Se saca de la sesión en el mismo movimiento: si el
+             * ingreso falla, el link no queda esperando para el próximo intento
+             * de otra persona en la misma computadora.
+             */
+            $usuario = $this->ingreso->resolver(
+                $cuenta,
+                $request->session()->pull(InvitacionPorLinkController::CLAVE),
+            );
         } catch (AccesoNoAutorizado $e) {
             /*
              * Caso esperado, no un fallo: entró bien a Google pero no está

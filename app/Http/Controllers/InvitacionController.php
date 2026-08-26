@@ -35,7 +35,7 @@ class InvitacionController extends Controller
          * las cruza. Es el mismo cruce que hace el ingreso con Google.
          */
         $usuarios = User::query()
-            ->whereIn('email', $invitaciones->pluck('email'))
+            ->whereIn('email', $invitaciones->pluck('email')->filter())
             ->withCount(['favoritos', 'listas'])
             ->get()
             ->keyBy('email');
@@ -44,11 +44,12 @@ class InvitacionController extends Controller
 
         return Inertia::render('settings/Invitaciones', [
             'invitaciones' => $invitaciones->map(function (Invitacion $i) use ($usuarios, $actividad) {
-                $usuario = $usuarios->get($i->email);
+                $usuario = $i->email === null ? null : $usuarios->get($i->email);
 
                 return [
                     'id' => $i->id,
                     'email' => $i->email,
+                    'url' => $i->url(),
                     'estado' => $i->estado(),
                     'invitada_el' => $i->created_at?->isoFormat('D [de] MMMM [de] YYYY'),
                     'expira_en' => $i->expira_en?->isoFormat('D [de] MMMM [de] YYYY'),
@@ -101,6 +102,29 @@ class InvitacionController extends Controller
     }
 
     /**
+     * Un link para pasarle a alguien cuya dirección no sabés.
+     *
+     * Sirve una sola vez: al entrar, esta misma fila pasa a ser la invitación
+     * de quien lo usó. Ver Invitacion::reclamar().
+     */
+    public function link(Request $request): RedirectResponse
+    {
+        $datos = $request->validate([
+            'vence_en_dias' => ['nullable', 'integer', 'min:1', 'max:365'],
+        ]);
+
+        $dias = $datos['vence_en_dias'] ?? null;
+
+        Invitacion::create([
+            'token' => Invitacion::tokenNuevo(),
+            'invitada_por' => $request->user()?->id,
+            'expira_en' => $dias === null ? null : Carbon::now()->addDays($dias),
+        ]);
+
+        return back()->with('estado', 'Link creado. Copialo y pasáselo a quien quieras invitar.');
+    }
+
+    /**
      * Cancela una invitación que nadie usó.
      *
      * Se borra de verdad y no se revoca porque no hay nada que recordar: si la
@@ -110,9 +134,14 @@ class InvitacionController extends Controller
     {
         abort_unless($invitacion->aceptada_en === null, 404);
 
+        $eraLink = $invitacion->email === null;
+
         $invitacion->delete();
 
-        return back()->with('estado', 'Invitación cancelada.');
+        return back()->with(
+            'estado',
+            $eraLink ? 'Link dado de baja. Si ya lo pasaste, deja de servir.' : 'Invitación cancelada.',
+        );
     }
 
     /**

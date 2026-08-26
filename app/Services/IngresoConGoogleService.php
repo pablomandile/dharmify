@@ -29,11 +29,23 @@ class IngresoConGoogleService
     }
 
     /**
+     * @param  string|null  $token  El link de invitación con el que llegó, si vino por uno.
+     *
      * @throws AccesoNoAutorizado si esa persona no está habilitada.
      */
-    public function resolver(CuentaDeGoogle $cuenta): User
+    public function resolver(CuentaDeGoogle $cuenta, ?string $token = null): User
     {
-        return DB::transaction(function () use ($cuenta) {
+        return DB::transaction(function () use ($cuenta, $token) {
+            /*
+             * El link se consume ANTES de mirar nada más, y por eso está acá
+             * arriba: a partir de este momento la persona tiene una invitación
+             * a su nombre y las tres ramas de abajo no necesitan saber que
+             * existen los links.
+             */
+            if ($token !== null) {
+                Invitacion::reclamar($token, $cuenta->email);
+            }
+
             // 1. Ya entró antes con esta misma cuenta de Google.
             $usuario = User::query()->where('google_id', $cuenta->id)->first();
 

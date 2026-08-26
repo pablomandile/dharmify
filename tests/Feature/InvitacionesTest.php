@@ -339,6 +339,179 @@ class InvitacionesTest extends TestCase
             ->assertInertia(fn (Assert $p) => $p->where('sinAcceso', true));
     }
 
+    public function test_crear_un_link_no_le_pone_dueño_a_nadie(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)
+            ->post('/settings/invitaciones/link')
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $link = Invitacion::firstOrFail();
+
+        $this->assertNull($link->email);
+        $this->assertNotNull($link->token);
+        $this->assertSame(Invitacion::LINK, $link->estado());
+        $this->assertSame($admin->id, $link->invitada_por);
+    }
+
+    /**
+     * El link consumido deja de ser un link y pasa a ser la invitación de quien
+     * lo usó. Es lo que hace que una fila siga siendo una persona, y que el
+     * panel, el vencimiento y la revocación no necesiten un caso especial.
+     */
+    public function test_usar_un_link_lo_convierte_en_la_invitacion_de_quien_entro(): void
+    {
+        $link = Invitacion::create(['token' => Invitacion::tokenNuevo()]);
+
+        $this->assertTrue(Invitacion::reclamar($link->token, 'Ana@Gmail.com'));
+
+        $link = $link->fresh();
+
+        $this->assertSame('ana@gmail.com', $link->email);
+        $this->assertNull($link->token);
+        $this->assertSame(1, Invitacion::count());
+    }
+
+    /** Un solo uso: al segundo ya no queda token que reclamar. */
+    public function test_un_link_no_sirve_dos_veces(): void
+    {
+        $link = Invitacion::create(['token' => Invitacion::tokenNuevo()]);
+        $token = $link->token;
+
+        $this->assertTrue(Invitacion::reclamar($token, 'ana@gmail.com'));
+        $this->assertFalse(Invitacion::reclamar($token, 'otra@gmail.com'));
+
+        $this->assertSame(1, Invitacion::count());
+        $this->assertSame('ana@gmail.com', Invitacion::firstOrFail()->email);
+    }
+
+    public function test_un_link_revocado_o_vencido_no_se_puede_reclamar(): void
+    {
+        $revocado = Invitacion::create([
+            'token' => Invitacion::tokenNuevo(),
+            'revocada_en' => now(),
+        ]);
+        $vencido = Invitacion::create([
+            'token' => Invitacion::tokenNuevo(),
+            'expira_en' => now()->subDay(),
+        ]);
+
+        $this->assertFalse(Invitacion::reclamar($revocado->token, 'ana@gmail.com'));
+        $this->assertFalse(Invitacion::reclamar($vencido->token, 'otra@gmail.com'));
+    }
+
+    /**
+     * El caso que obliga a no crear una fila nueva: `email` es unique, así que
+     * pasarle un link a alguien a quien le habías dejado de compartir tiene que
+     * reactivar la invitación que ya estaba, no chocar contra el índice.
+     */
+    public function test_un_link_reactiva_la_invitacion_de_alguien_revocado(): void
+    {
+        $this->sembrarBiblioteca();
+
+        $usuario = $this->invitada();
+        Invitacion::query()->update(['revocada_en' => now()]);
+
+        $link = Invitacion::create(['token' => Invitacion::tokenNuevo()]);
+
+        $this->assertTrue(Invitacion::reclamar($link->token, $usuario->email));
+
+        // El link se consumió y no quedó una segunda fila para el mismo email.
+        $this->assertSame(1, Invitacion::count());
+        $this->assertNull(Invitacion::firstOrFail()->revocada_en);
+
+        $this->comoRecienLlegada($usuario)->get('/biblioteca')
+            ->assertInertia(fn (Assert $p) => $p->where('sinAcceso', false));
+    }
+
+    public function test_la_url_del_link_apunta_a_la_ruta_publica(): void
+    {
+        $link = Invitacion::create(['token' => Invitacion::tokenNuevo()]);
+
+        $this->assertSame(route('invitacion.aceptar', $link->token), $link->url());
+    }
+
+    /** Una invitación por email no tiene link que mostrar. */
+    public function test_una_invitacion_por_email_no_tiene_url(): void
+    {
+        $this->assertNull(Invitacion::create(['email' => 'ana@gmail.com'])->url());
+    }
+
+    public function test_un_link_vivo_manda_a_google(): void
+    {
+        $link = Invitacion::create(['token' => Invitacion::tokenNuevo()]);
+
+        $this->get("/invitacion/{$link->token}")
+            ->assertRedirect(route('google.redirect'));
+
+        $this->assertSame($link->token, session('invitacion_token'));
+    }
+
+    public function test_un_link_que_ya_no_sirve_manda_al_login_con_su_motivo(): void
+    {
+        $this->get('/invitacion/nada-de-esto-existe')
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('errorDeIngreso');
+    }
+
+    /**
+     * A quien ya tiene la sesión abierta no se lo manda a Google de nuevo: se
+     * le reclama el link con la cuenta que está usando. Sin esto, alguien a
+     * quien le dejaron de compartir la biblioteca tendría que desloguearse para
+     * poder usar el link nuevo.
+     */
+    public function test_quien_ya_tiene_sesion_usa_el_link_sin_pasar_por_google(): void
+    {
+        $this->sembrarBiblioteca();
+
+        $usuario = $this->invitada();
+        Invitacion::query()->update(['revocada_en' => now()]);
+
+        $link = Invitacion::create(['token' => Invitacion::tokenNuevo()]);
+
+        $this->actingAs($usuario)->get("/invitacion/{$link->token}")
+            ->assertRedirect(route('biblioteca'));
+
+        $this->comoRecienLlegada($usuario)->get('/biblioteca')
+            ->assertInertia(fn (Assert $p) => $p->where('sinAcceso', false));
+    }
+
+    public function test_se_da_de_baja_un_link_sin_usar(): void
+    {
+        $link = Invitacion::create(['token' => Invitacion::tokenNuevo()]);
+
+        $this->actingAs($this->admin())
+            ->delete("/settings/invitaciones/{$link->id}")
+            ->assertRedirect();
+
+        $this->assertSame(0, Invitacion::count());
+        $this->get("/invitacion/{$link->token}")->assertRedirect(route('login'));
+    }
+
+    public function test_crear_un_link_es_solo_del_administrador(): void
+    {
+        $this->actingAs($this->invitada())
+            ->post('/settings/invitaciones/link')
+            ->assertNotFound();
+
+        $this->assertSame(1, Invitacion::count());
+    }
+
+    public function test_el_panel_muestra_el_link_para_copiar(): void
+    {
+        $link = Invitacion::create(['token' => Invitacion::tokenNuevo()]);
+
+        $this->actingAs($this->admin())->get('/settings/invitaciones')
+            ->assertOk()
+            ->assertInertia(fn (Assert $p) => $p
+                ->where('invitaciones.0.estado', Invitacion::LINK)
+                ->where('invitaciones.0.email', null)
+                ->where('invitaciones.0.url', $link->url())
+                ->etc());
+    }
+
     public function test_no_se_invita_a_cualquier_cosa(): void
     {
         $this->actingAs($this->admin())

@@ -167,8 +167,15 @@ carátula** (83 propias, 62 dibujadas), 901 pistas con duración exacta.
 La invitación no es un alta de una sola vez: es el permiso vigente de ver la
 biblioteca. Revocarla —desde `/settings/invitaciones`— le saca el contenido a
 esa persona en el próximo pedido sin tocarle la cuenta ni sus favoritos ni sus
-listas; volver a compartir se lo devuelve tal cual lo dejó. No manda mail: el
-servidor no tiene un mailer configurado, así que el link se pasa a mano.
+listas; volver a compartir se lo devuelve tal cual lo dejó.
+
+Se invita de dos formas, y las dos terminan en la misma fila: **por email**, si
+sabés la dirección de su cuenta de Google, o con un **link de un solo uso**, si
+no la sabés. Al usarse, el link deja de ser un link y pasa a ser la invitación
+de quien entró, con su dirección adentro — por eso el vencimiento, el panel y la
+revocación funcionan igual para los dos casos, sin ningún camino especial. No
+manda mail: el servidor no tiene un mailer configurado, así que el link lo
+pasás vos.
 
 Pendiente: retomar donde quedaste, la purga automática del servidor, mandar el
 mail de invitación (necesita SMTP configurado), y la biblioteca pública —el

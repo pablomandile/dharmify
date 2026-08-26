@@ -91,6 +91,36 @@ class IngresoConGoogleTest extends TestCase
     }
 
     /**
+     * El camino completo del link: alguien que no estaba invitado por email
+     * entra igual, porque llegó con un token, y queda como invitado.
+     */
+    public function test_quien_llega_con_un_link_entra_y_el_link_se_consume(): void
+    {
+        $link = Invitacion::create(['token' => Invitacion::tokenNuevo()]);
+
+        $usuario = $this->servicio()->resolver(
+            $this->cuenta('amiga@example.test'),
+            $link->token,
+        );
+
+        $this->assertSame(User::ROL_INVITADO, $usuario->rol);
+
+        $link = $link->fresh();
+
+        $this->assertSame('amiga@example.test', $link->email);
+        $this->assertNull($link->token);
+        $this->assertNotNull($link->aceptada_en);
+    }
+
+    /** Un token inventado no abre nada: sigue haciendo falta una invitación. */
+    public function test_un_token_que_no_existe_no_deja_entrar(): void
+    {
+        $this->expectException(AccesoNoAutorizado::class);
+
+        $this->servicio()->resolver($this->cuenta('amiga@example.test'), 'inventado');
+    }
+
+    /**
      * El corazón de todo esto: entrar bien a Google NO da acceso. La biblioteca
      * es privada y sin invitación se rebota, por más impecable que sea la cuenta.
      */
