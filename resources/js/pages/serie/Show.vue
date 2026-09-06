@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { ArrowLeft, ImageUp, Loader2, Pencil } from '@lucide/vue';
+import {
+    ArrowLeft,
+    Check,
+    ImageUp,
+    Loader2,
+    Pencil,
+    Smartphone,
+} from '@lucide/vue';
 import { computed, onMounted, ref } from 'vue';
 import FilaDePista from '@/components/FilaDePista.vue';
 import { Badge } from '@/components/ui/badge';
@@ -30,9 +37,75 @@ defineOptions({
     },
 });
 
-const { revisar } = useOffline();
+const { revisar, guardadas, guardar, borrar } = useOffline();
 
 onMounted(revisar);
+
+const ficha = (p: FichaDePista) => ({
+    titulo: p.titulo,
+    serie: p.serie,
+    serieId: p.serieId,
+    portada: p.portada,
+    duracion_seg: p.duracion_seg,
+    bytes: p.bytes,
+});
+
+/*
+ * El botón de la carpeta entera es un atajo al mismo botón de cada fila: pide
+ * lo mismo, guarda en la misma caché del dispositivo y no toca el server. No
+ * es "descargar el archivo" (eso es el ícono de descarga de cada fila, que sí
+ * baja el mp3 al disco) — esto guarda para escuchar sin conexión desde la app.
+ */
+const faltanOffline = computed(() =>
+    props.pistas.filter((p) => !guardadas.value.has(p.id)),
+);
+
+const todaGuardadaOffline = computed(
+    () => props.pistas.length > 0 && faltanOffline.value.length === 0,
+);
+
+const guardandoCarpeta = ref(false);
+const progresoCarpeta = ref<{ hecho: number; total: number } | null>(null);
+
+const guardarCarpetaOffline = async () => {
+    const faltan = faltanOffline.value;
+
+    if (!faltan.length || guardandoCarpeta.value) {
+        return;
+    }
+
+    guardandoCarpeta.value = true;
+
+    /*
+     * Una por una, no todas juntas: cada guardar() ya trae de la nube si hace
+     * falta y junta el archivo entero en memoria, y una carpeta puede tener
+     * decenas de pistas de decenas de MB cada una.
+     */
+    for (let i = 0; i < faltan.length; i++) {
+        progresoCarpeta.value = { hecho: i, total: faltan.length };
+        await guardar(faltan[i].id, ficha(faltan[i]));
+    }
+
+    progresoCarpeta.value = null;
+    guardandoCarpeta.value = false;
+};
+
+const quitarCarpetaOffline = async () => {
+    if (guardandoCarpeta.value) {
+        return;
+    }
+
+    for (const pista of props.pistas) {
+        if (guardadas.value.has(pista.id)) {
+            await borrar(pista.id);
+        }
+    }
+};
+
+const alternarCarpetaOffline = () =>
+    todaGuardadaOffline.value
+        ? quitarCarpetaOffline()
+        : guardarCarpetaOffline();
 
 const etiquetaTipo: Record<string, string> = {
     retiro: 'Retiro',
@@ -288,6 +361,38 @@ const subirPortada = (evento: Event) => {
                     {{ serie.carpeta }}
                 </p>
             </div>
+        </div>
+
+        <div class="flex justify-end">
+            <Button
+                variant="outline"
+                size="sm"
+                :disabled="guardandoCarpeta || !pistas.length"
+                :class="todaGuardadaOffline && 'border-primary/40 text-primary'"
+                :title="
+                    todaGuardadaOffline
+                        ? 'Guardada en este dispositivo — tocá para quitarla'
+                        : 'Guardar toda la carpeta en este dispositivo para escuchar sin conexión'
+                "
+                :aria-label="
+                    todaGuardadaOffline
+                        ? 'Quitar la carpeta de este dispositivo'
+                        : 'Guardar la carpeta para escuchar sin conexión'
+                "
+                @click="alternarCarpetaOffline"
+            >
+                <Loader2 v-if="guardandoCarpeta" class="size-4 animate-spin" />
+                <Check v-else-if="todaGuardadaOffline" class="size-4" />
+                <Smartphone v-else class="size-4" />
+
+                <template v-if="guardandoCarpeta">
+                    Guardando…
+                    {{ progresoCarpeta?.hecho ?? 0 }}/{{
+                        progresoCarpeta?.total ?? faltanOffline.length
+                    }}
+                </template>
+                <template v-else>Offline</template>
+            </Button>
         </div>
 
         <div class="divide-y overflow-hidden rounded-xl border">
