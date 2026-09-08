@@ -161,11 +161,11 @@ const crearYAgregar = () => {
 
 <template>
     <div
-        class="flex items-center gap-3 px-3 py-2.5 transition-colors"
+        class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2.5 transition-colors sm:flex-nowrap"
         :class="esActual() ? 'bg-primary/10' : 'hover:bg-accent/40'"
     >
         <button
-            class="grid size-9 shrink-0 place-items-center rounded-full border transition-colors"
+            class="order-5 grid size-9 shrink-0 place-items-center rounded-full border transition-colors sm:order-0"
             :class="
                 esActual()
                     ? 'border-primary bg-primary text-primary-foreground'
@@ -186,12 +186,15 @@ const crearYAgregar = () => {
 
         <span
             v-if="indice !== undefined"
-            class="w-5 shrink-0 text-right text-xs text-muted-foreground tabular-nums"
+            class="order-1 w-5 shrink-0 text-right text-xs text-muted-foreground tabular-nums sm:order-0"
         >
             {{ indice }}
         </span>
 
-        <button class="min-w-0 flex-1 text-left" @click="tocar">
+        <button
+            class="order-2 min-w-0 flex-1 text-left sm:order-0"
+            @click="tocar"
+        >
             <p
                 class="truncate text-sm"
                 :class="esActual() && 'font-medium text-primary'"
@@ -205,20 +208,34 @@ const crearYAgregar = () => {
                 <template v-else-if="progreso[pista.id]">
                     Guardando… {{ progreso[pista.id] }}
                 </template>
+                <!--
+                    En celular no entra todo esto junto al título: serie, fecha,
+                    duración y peso quedan para pantallas anchas, y la duración
+                    sola se repite aparte, al final de la primera línea.
+                -->
                 <template v-else>
-                    <template v-if="mostrarSerie">
-                        {{ pista.serie }} ·
-                    </template>
-                    <template v-if="pista.grabada_el">
-                        {{ pista.grabada_el }} ·
-                    </template>
-                    <template v-if="duracion(pista.duracion_seg)">
-                        {{ duracion(pista.duracion_seg) }} ·
-                    </template>
-                    {{ enMegas(pista.bytes) }}
+                    <span class="hidden sm:inline">
+                        <template v-if="mostrarSerie">
+                            {{ pista.serie }} ·
+                        </template>
+                        <template v-if="pista.grabada_el">
+                            {{ pista.grabada_el }} ·
+                        </template>
+                        <template v-if="duracion(pista.duracion_seg)">
+                            {{ duracion(pista.duracion_seg) }} ·
+                        </template>
+                        {{ enMegas(pista.bytes) }}
+                    </span>
                 </template>
             </p>
         </button>
+
+        <span
+            v-if="!avisos[pista.id] && !progreso[pista.id]"
+            class="order-3 shrink-0 text-xs text-muted-foreground tabular-nums sm:hidden"
+        >
+            {{ duracion(pista.duracion_seg) ?? enMegas(pista.bytes) }}
+        </span>
 
         <!--
             Dónde está el archivo. Cambia lo que pasa al darle play: lo que está
@@ -238,7 +255,14 @@ const crearYAgregar = () => {
             {{ estaEnServer() ? 'En el server' : 'En la nube' }}
         </span>
 
-        <div class="flex shrink-0 items-center gap-0.5">
+        <!--
+            En celular todos los botones —play incluido— pasan a una segunda
+            línea: arriba queda la identificación (número, nombre, duración),
+            abajo la acción. Este div vacío fuerza el salto de línea.
+        -->
+        <div class="order-4 h-0 basis-full sm:hidden"></div>
+
+        <div class="order-6 flex shrink-0 items-center gap-0.5 sm:order-0">
             <button
                 class="rounded-md p-2 transition-colors hover:bg-accent"
                 :class="
