@@ -15,6 +15,7 @@ import {
     Smartphone,
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import { toast } from 'vue-sonner';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -95,6 +96,68 @@ const esActual = () => actual.value?.id === props.pista.id;
 const estaSonando = () => esActual() && sonando.value;
 const estaEnServer = () =>
     props.pista.en_server || enServer[props.pista.id] === true;
+
+const trayendo = ref(false);
+
+/*
+ * Si el audio sigue en la nube, el enlace de descarga contesta un JSON y eso es
+ * lo que se veía en pantalla. Se pregunta, se trae al server y recién entonces
+ * se baja.
+ */
+const bajar = async (e: Event) => {
+    if (estaEnServer()) {
+        return;
+    }
+
+    e.preventDefault();
+
+    if (trayendo.value) {
+        return;
+    }
+
+    if (!props.pista.en_nube) {
+        toast.error('Este audio no está disponible.');
+
+        return;
+    }
+
+    if (!confirm('Este audio está en la nube. ¿Descargar de la nube?')) {
+        return;
+    }
+
+    trayendo.value = true;
+    const aviso = toast.loading('Trayendo de la nube…');
+
+    try {
+        const res = await fetch(`/pistas/${props.pista.id}/restaurar`, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN':
+                    document.querySelector<HTMLMetaElement>(
+                        'meta[name="csrf-token"]',
+                    )?.content ?? '',
+                Accept: 'application/json',
+            },
+        });
+        const datos = await res.json();
+
+        if (datos.estado !== 'listo') {
+            toast.error(datos.mensaje ?? 'No se pudo traer de la nube.', {
+                id: aviso,
+            });
+
+            return;
+        }
+
+        enServer[props.pista.id] = true;
+        toast.dismiss(aviso);
+        window.location.href = `/pistas/${props.pista.id}/bajar`;
+    } catch {
+        toast.error('No se pudo traer de la nube.', { id: aviso });
+    } finally {
+        trayendo.value = false;
+    }
+};
 
 const ficha = () => ({
     titulo: props.pista.titulo,
@@ -392,6 +455,7 @@ const crearYAgregar = () => {
                 class="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
                 title="Descargar el audio"
                 aria-label="Descargar"
+                @click="bajar"
             >
                 <Download class="size-4" />
             </a>
